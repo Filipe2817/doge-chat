@@ -1,2 +1,3 @@
-# s-doge-chat
+# doge-chat
+
 Decentralized Chat Service

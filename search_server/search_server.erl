@@ -17,7 +17,7 @@ start() ->
 
 stop() ->
   ?MODULE ! stop,
-  init:stop(). % Clean shutdown Erlang node
+  init:stop(). % Shutdown erlang node gracefully (it stops the handlers too)
 
 acceptor(SSock) ->
   case gen_tcp:accept(SSock) of
