@@ -5,9 +5,15 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+%%--------------------------------------------------------------------
+%% API Functions
+%%--------------------------------------------------------------------
 start_link(Socket) ->
     gen_server:start_link(?MODULE, Socket, []).
 
+%%--------------------------------------------------------------------
+%% gen_server callbacks
+%%--------------------------------------------------------------------
 init(Socket) ->
 	io:format("Initializing client connection: ~p~n", [Socket]),
 	ok = inet:setopts(Socket, [{active, true}]),

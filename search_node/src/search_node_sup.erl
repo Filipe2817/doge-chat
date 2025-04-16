@@ -8,7 +8,6 @@
 -behaviour(supervisor).
 
 -export([start_link/0]).
-
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
@@ -23,16 +22,34 @@ init([]) ->
         period => 1
     },
 
-	AcceptorChild = #{
-		id => acceptor,
-		start => {acceptor, start_link, [1234]},
-		restart => permanent,
-		shutdown => 5000,
-		type => worker,
-		modules => [acceptor]
-	},
+    StateManagerChild = #{
+        id => state_manager,
+        start => {state_manager, start_link, []},
+        restart => permanent,
+        shutdown => 5000,
+        type => worker,
+        modules => [state_manager]
+    },
 
-    ChildSpecs = [AcceptorChild],
+    ConnectionSupChild = #{
+        id => connection_sup,
+        start => {connection_sup, start_link, []},
+        restart => permanent,
+        shutdown => 5000,
+        type => supervisor,
+        modules => [connection_sup]
+    },
+
+    AcceptorChild = #{
+        id => acceptor,
+        start => {acceptor, start_link, [1234, state_manager]},
+        restart => permanent,
+        shutdown => 5000,
+        type => worker,
+        modules => [acceptor]
+    },
+
+    %% Order matters: state_manager first, then connection_sup, then acceptor.
+	% This is because the acceptor needs to know the state_manager's PID.
+    ChildSpecs = [StateManagerChild, ConnectionSupChild, AcceptorChild],
     {ok, {SupFlags, ChildSpecs}}.
-
-%% internal functions
