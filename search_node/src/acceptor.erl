@@ -6,7 +6,7 @@
 
 % GenServer callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-		 terminate/2, code_change/3]).
+		 terminate/2]).
 
 % GenServer client API
 start_link(Port) ->
@@ -37,8 +37,8 @@ handle_info(accept, {ListenSocket, _Port} = State) ->
 	case gen_tcp:accept(ListenSocket) of
 		{ok, Socket} ->
 			io:format("Accepted connection: ~p~n", [Socket]),
-			% should replace this to spawn a new process that will handle the connection
-			spawn(fun() -> handle_connection(Socket) end),
+			{ok, Pid} = client_conn:start_link(Socket),
+			ok = gen_tcp:controlling_process(Socket, Pid),
 			self() ! accept,
 			{noreply, State};
 		{error, Reason} ->
@@ -53,19 +53,3 @@ handle_info(_Info, State) ->
 terminate(_Reason, _State) ->
 	%% Clean up resources if needed
 	ok.
-
-code_change(_OldVsn, State, _Extra) ->
-	%% Handle code changes if needed
-	{ok, State}.
-
-%% internal functions
-handle_connection(Socket) ->
-    case gen_tcp:recv(Socket, 0) of
-        {ok, Data} ->
-            io:format("Received data: ~p~n", [Data]),
-			% Here we need to handle the data received
-			handle_connection(Socket);
-        {error, Reason} ->
-            io:format("Connection closed: ~p~n", [Reason])
-    end,
-    gen_tcp:close(Socket).
