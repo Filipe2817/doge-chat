@@ -18,5 +18,19 @@ reply(Msg, ReplyType, ExtraFields, State) ->
     ReplyBody = maps:merge(#{<<"type">> => ReplyType, <<"in_reply_to">> => InReplyTo}, ExtraFields),
     send_msg(maps:get(<<"src">>, Msg), ReplyBody, State).
 
+broadcast(Type, ExtraFields, State) ->
+    NodeId = maps:get(node_id, State),
+    NodeIds = maps:get(node_ids, State, []),
+    lists:foreach(
+        fun(Dest) ->
+            if Dest =/= NodeId ->
+                send_msg(Dest, maps:merge(#{<<"type">> => Type}, ExtraFields), State);
+            true ->
+                ok
+            end
+        end,
+        NodeIds
+    ).
+
 print(Format, Args) ->
     io:format(standard_error, Format, Args).

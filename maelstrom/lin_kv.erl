@@ -6,14 +6,16 @@
 % the only solution is to include header files with the functions
 % having unused functions may cause warnings that break maelstrom execution
 -include("helpers.hrl").
-%-include("dht.hrl").
+-include("dht.hrl").
 
 main(_Args) ->
     loop(#{
         node_id => undefined,
         node_ids => [],
         msg_id => 0,
-        store => #{}
+        store => #{},
+        neighbors => [],
+        node_hashes => []
     }).
 
 loop(State) ->
@@ -41,9 +43,14 @@ handle_message(#{<<"body">> := Body} = Msg, State) ->
     Type = maps:get(<<"type">>, Body, <<>>),
     case Type of
         <<"init">> -> handle_init(Msg, State);
+        <<"node_info">> -> handle_node_info(Msg, State);
+        <<"forward_result">> -> handle_forward_result(Msg, State);
         <<"read">> -> handle_read(Msg, State);
+        <<"redirected_read">> -> handle_redirected_read(Msg, State);
         <<"write">> -> handle_write(Msg, State);
+        <<"redirected_write">> -> handle_redirected_write(Msg, State);
         <<"cas">> -> handle_cas(Msg, State);
+        <<"redirected_cas">> -> handle_redirected_cas(Msg, State);
         _Other ->
             print("Unknown message type: ~p~n", [Type]),
             State
@@ -51,139 +58,168 @@ handle_message(#{<<"body">> := Body} = Msg, State) ->
 
 handle_init(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
+    NodeId = maps:get(<<"node_id">>, Body),
+    NodeIds = maps:get(<<"node_ids">>, Body, []),
+    NodeHash = sha1(NodeId),
     NewState = State#{
-        node_id := maps:get(<<"node_id">>, Body),
-        node_ids := maps:get(<<"node_ids">>, Body, [])
+        node_id := NodeId,
+        node_ids := NodeIds,
+        node_hashes := [{NodeHash, NodeId}]
     },
-    reply(Msg, <<"init_ok">>, #{}, NewState).
+    FinalState = reply(Msg, <<"init_ok">>, #{}, NewState),
+    broadcast(<<"node_info">>, #{<<"node_hash">> => NodeHash}, FinalState),
+    FinalState.
+
+handle_node_info(Msg, State) ->
+    Body = maps:get(<<"body">>, Msg),
+    Sender = maps:get(<<"src">>, Msg),
+    NodeHash = maps:get(<<"node_hash">>, Body),
+    #{node_hashes := NodeHashes} = State,
+    NewNodeHashes = [{NodeHash, Sender} | NodeHashes],
+    State#{node_hashes := lists:sort(NewNodeHashes)}.
+
+handle_forward_result(Msg, State) ->
+    Body = maps:get(<<"body">>, Msg),
+    Client = maps:get(<<"client">>, Body),
+    Type = maps:get(<<"type">>, Body),
+    DefaultResponseBody = #{
+        <<"type">> => Type,
+        <<"in_reply_to">> => maps:get(<<"client_msg_id">>, Body)
+    },
+    if Type =:= <<"read_ok">> ->
+        Value = maps:get(<<"value">>, Body),
+        ResponseBody = maps:put(<<"value">>, Value, DefaultResponseBody);
+    true ->
+        ResponseBody = DefaultResponseBody
+    end,
+    send_msg(Client, ResponseBody, State).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% READ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+execute_read(Key, State) ->
+    #{store := Store} = State,
+    Value = maps:get(Key, Store, null),
+    {<<"read_ok">>, #{<<"value">> => Value}, State}.
 
 handle_read(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
-    Key = maps:get(<<"key">>, Body, undefined),
+    Key = maps:get(<<"key">>, Body),
+    Node = get_responsible_node(Key, State),
+    MyId = maps:get(node_id, State),
+    if Node =:= MyId ->
+        {ResultType, ResultBody, NewState} = execute_read(Key, State),
+        reply(Msg, ResultType, ResultBody, NewState);
+    true ->
+        NewBody = #{
+            <<"type">> => <<"redirected_read">>,
+            <<"key">> => Key,
+            <<"client">> => maps:get(<<"src">>, Msg),
+            <<"client_msg_id">> => maps:get(<<"msg_id">>, Body)
+        },
+        send_msg(Node, NewBody, State)
+    end.
+
+handle_redirected_read(Msg, State) ->
+    Body = maps:get(<<"body">>, Msg),
+    Key = maps:get(<<"key">>, Body),
+    Client = maps:get(<<"client">>, Body),
+    ClientMsgId = maps:get(<<"client_msg_id">>, Body),
+    {ResultType, ResultBody, NewState} = execute_read(Key, State),
+    NewBody = maps:merge(ResultBody, #{
+        <<"original_type">> => ResultType,
+        <<"client">> => Client, 
+        <<"client_msg_id">> => ClientMsgId
+    }),
+    reply(Msg, <<"forward_result">>, NewBody, NewState).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% WRITE %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+execute_write(Key, Value, State) ->
     #{store := Store} = State,
-    Value = maps:get(Key, Store, null),
-    reply(Msg, <<"read_ok">>, #{<<"value">> => Value}, State).
+    NewState = State#{store := maps:put(Key, Value, Store)},
+    {<<"write_ok">>, #{}, NewState}.
 
 handle_write(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
     Key = maps:get(<<"key">>, Body, undefined),
-    Value = maps:get(<<"value">>, Body, undefined),
-    #{store := Store} = State,
-    NewState = State#{store := maps:put(Key, Value, Store)},
-    reply(Msg, <<"write_ok">>, #{}, NewState).
+    Node = get_responsible_node(Key, State),
+    MyId = maps:get(node_id, State),
+    if Node =:= MyId ->
+        Value = maps:get(<<"value">>, Body),
+        {ResultType, ResultBody, NewState} = execute_write(Key, Value, State),
+        reply(Msg, ResultType, ResultBody, NewState);
+    true ->
+        NewBody = #{
+            <<"type">> => <<"redirected_write">>,
+            <<"key">> => Key,
+            <<"value">> => maps:get(<<"value">>, Body),
+            <<"client">> => maps:get(<<"src">>, Msg),
+            <<"client_msg_id">> => maps:get(<<"msg_id">>, Body)
+        },
+        send_msg(Node, NewBody, State)
+    end.
 
-handle_cas(Msg, State) ->
+handle_redirected_write(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
-    Key = maps:get(<<"key">>, Body, undefined),
-    From = maps:get(<<"from">>, Body, undefined),
-    To = maps:get(<<"to">>, Body, undefined),
+    Key = maps:get(<<"key">>, Body),
+    Value = maps:get(<<"value">>, Body),
+    Client = maps:get(<<"client">>, Body),
+    ClientMsgId = maps:get(<<"client_msg_id">>, Body),
+    {ResultType, ResultBody, NewState} = execute_write(Key, Value, State),
+    NewBody = maps:merge(ResultBody, #{
+        <<"original_type">> => ResultType,
+        <<"client">> => Client, 
+        <<"client_msg_id">> => ClientMsgId
+    }),
+    reply(Msg, <<"forward_result">>, NewBody, NewState).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CAS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+execute_cas(Key, From, To, State) ->
     #{store := Store} = State,
     case maps:find(Key, Store) of
         error ->
-            reply(Msg, <<"error">>, #{<<"code">> => 20}, State);
+            {<<"error">>, #{<<"code">> => 20}, State};
         {ok, From} ->
             NewState = State#{store := maps:put(Key, To, Store)},
-            reply(Msg, <<"cas_ok">>, #{}, NewState);
+            {<<"cas_ok">>, #{}, NewState};
         {ok, _} ->
-            reply(Msg, <<"error">>, #{<<"code">> => 22}, State)
+            {<<"error">>, #{<<"code">> => 22}, State}
     end.
 
+handle_cas(Msg, State) ->
+    Body = maps:get(<<"body">>, Msg),
+    Key = maps:get(<<"key">>, Body),
+    Node = get_responsible_node(Key, State),
+    MyId = maps:get(node_id, State),
+    if Node =:= MyId ->
+        From = maps:get(<<"from">>, Body),
+        To = maps:get(<<"to">>, Body),
+        {ResultType, ResultBody, NewState} = execute_cas(Key, From, To, State),
+        reply(Msg, ResultType, ResultBody, NewState);
+    true ->
+        NewBody = #{
+            <<"type">> => <<"redirected_cas">>,
+            <<"key">> => Key,
+            <<"from">> => maps:get(<<"from">>, Body),
+            <<"to">> => maps:get(<<"to">>, Body),
+            <<"client">> => maps:get(<<"src">>, Msg),
+            <<"client_msg_id">> => maps:get(<<"msg_id">>, Body)
+        },
+        send_msg(Node, NewBody, State)
+    end.
 
-
-
-
-
-
-
-%%neighbors = []
-%%kv = {}
-%%
-%%bucket_hashes = []
-%%
-%%def find_responsible_node(key):
-%%    global bucket_hashes
-%%    key_hash = hashlib.sha1(str(key).encode()).hexdigest()
-%%    for i in range(len(bucket_hashes) - 1):
-%%        if key_hash > bucket_hashes[i][0]:
-%%            return bucket_hashes[i + 1][1]
-%%    return bucket_hashes[0][1]
-%%
-%%@handler
-%%def init(msg):
-%%    global bucket_hashes
-%%    n.init(msg)
-%%    bucket_hash = hashlib.sha1(str(node_id()).encode()).hexdigest()
-%%    bucket_hashes.append((bucket_hash,node_id()))
-%%    for node in node_ids():
-%%        if node != node_id():
-%%            send(node, type='init_buckets', bucket_hash=bucket_hash)
-%%            
-%%@handler
-%%def init_buckets(msg):
-%%    global bucket_hashes
-%%    bucket_hash = msg.body.bucket_hash
-%%    bucket_hashes.append((bucket_hash, msg.src))
-%%    bucket_hashes.sort()
-%%
-%%
-%%@handler
-%%def read(msg):
-%%    key = msg.body.key
-%%    node = find_responsible_node(key)
-%%    if node == node_id():
-%%        value = kv.get(key, None)
-%%        reply(msg, type='read_ok', value=value)
-%%    else:
-%%        send_with_other_src(msg.src, node, type='read', key=key)
-%%
-%%@handler
-%%def write(msg):
-%%    key = msg.body.key
-%%    value = msg.body.value
-%%
-%%    node = find_responsible_node(key)
-%%
-%%    if node == node_id():
-%%        kv[key] = value
-%%        reply(msg, type='write_ok')
-%%    else:
-%%        send_with_other_src(msg.src, node, type='write', key=key, value=value)
-%%
-%%@handler
-%%def cas(msg):
-%%    key = msg.body.key
-%%    from_value = getattr(msg.body, 'from')
-%%    to = msg.body.to
-%%
-%%    node = find_responsible_node(key)
-%%
-%%    if node == node_id():
-%%        key = msg.body.key
-%%        from_value = getattr(msg.body, 'from')
-%%        to = msg.body.to
-%%        if key not in kv:
-%%            reply(msg, type='error', code=20, key=msg.body.key)
-%%            return
-%%        if kv[key] != from_value:
-%%            reply(msg, type='error', code=22, key=msg.body.key)
-%%            return
-%%        kv[key] = to
-%%        reply(msg, type='cas_ok')
-%%    else:
-%%        body = {"from": from_value, "to": to}
-%%        send_with_other_src(msg.src, node, type='cas', key=key, **body)
-%%
-%%def send_with_other_src(src, dest, body={}, /, **kwds):
-%%    global _msg_id
-%%    _msg_id += 1
-%%    if isinstance(body, dict):
-%%        body = body.copy()
-%%    else:
-%%        body = dict(vars(body))
-%%    body.update(kwds, msg_id=_msg_id)
-%%    msg = dict(src=src, dest=dest, body=body)
-%%    data = json.dumps(msg, default=vars)
-%%    log("Sent " + data)
-%%    print(data, flush=True)
-
-
+handle_redirected_cas(Msg, State) ->
+    Body = maps:get(<<"body">>, Msg),
+    Key = maps:get(<<"key">>, Body),
+    From = maps:get(<<"from">>, Body),
+    To = maps:get(<<"to">>, Body),
+    Client = maps:get(<<"client">>, Body),
+    ClientMsgId = maps:get(<<"client_msg_id">>, Body),
+    {ResultType, ResultBody, NewState} = execute_cas(Key, From, To, State),
+    NewBody = maps:merge(ResultBody, #{
+        <<"original_type">> => ResultType,
+        <<"client">> => Client, 
+        <<"client_msg_id">> => ClientMsgId
+    }),
+    reply(Msg, <<"forward_result">>, NewBody, NewState).
