@@ -19,8 +19,9 @@ init([]) ->
     {ok, {SupFlags, []}}.
 
 start_child(Socket) ->
+    ChildId = {client_conn, Socket},
     ChildSpec = #{
-        id => client_conn,
+        id => ChildId,
         start => {client_conn, start_link, [Socket]},
         restart => transient,
         shutdown => 5000,

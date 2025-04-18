@@ -42,7 +42,7 @@ init([]) ->
 
     AcceptorChild = #{
         id => acceptor,
-        start => {acceptor, start_link, [1234, state_manager]},
+        start => {acceptor, start_link, [1234]},
         restart => permanent,
         shutdown => 5000,
         type => worker,

@@ -16,24 +16,23 @@ start_link() ->
 
 %% get(Key) returns the value or not_found if Key does not exist.
 get(Key) ->
-    gen_server:call(?MODULE, {get, Key}).
+	gen_server:call(?MODULE, {get, Key}).
 
 %% put(Key, Value) stores the value and returns ok.
 put(Key, Value) ->
-    gen_server:call(?MODULE, {put, Key, Value}).
+	gen_server:call(?MODULE, {put, Key, Value}).
 
 %%--------------------------------------------------------------------
 %% gen_server callbacks
 %%--------------------------------------------------------------------
 init([]) ->
-    %% Initialize with an empty map
     {ok, #{}}.
 
 handle_call({get, Key}, _From, State) ->
     Value = maps:get(Key, State, not_found),
     {reply, Value, State};
 handle_call({put, Key, Value}, _From, State) ->
-	NewState = State#{Key := Value},
+	NewState = maps:put(Key, Value, State),
     {reply, ok, NewState};
 handle_call(_Request, _From, State) ->
     {reply, error, State}.
