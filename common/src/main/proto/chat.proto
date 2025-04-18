@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package com.doge.common.proto;
+
+option java_package = "com.doge.common.proto";
+option java_multiple_files = true;
+
+message ChatMessage {
+    string topic = 1;
+    string clientId = 2;
+    string content = 3;
+}
+
+message ForwardChatMessage {
+    ChatMessage chatMessage = 1;
+}
+
+message MessageWrapper {
+    oneof message_type {
+        ChatMessage chatMessage = 1;
+        ForwardChatMessage forwardChatMessage = 2;
+    }
+}
