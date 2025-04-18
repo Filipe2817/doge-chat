@@ -33,7 +33,6 @@ loop(State) ->
                     print("Failed to decode JSON: ~p~n", [Reason]),
                     loop(State);
                 Msg ->
-                    print("Received: ~p~n", [Msg]),
                     NewState = handle_message(Msg, State),
                     loop(NewState)
             end
@@ -80,17 +79,22 @@ handle_node_info(Msg, State) ->
 
 handle_forward_result(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
+    Type = maps:get(<<"original_type">>, Body),
     Client = maps:get(<<"client">>, Body),
-    Type = maps:get(<<"type">>, Body),
+    ClientMsgId = maps:get(<<"client_msg_id">>, Body),
     DefaultResponseBody = #{
         <<"type">> => Type,
-        <<"in_reply_to">> => maps:get(<<"client_msg_id">>, Body)
+        <<"in_reply_to">> => ClientMsgId
     },
-    if Type =:= <<"read_ok">> ->
-        Value = maps:get(<<"value">>, Body),
-        ResponseBody = maps:put(<<"value">>, Value, DefaultResponseBody);
-    true ->
-        ResponseBody = DefaultResponseBody
+    ResponseBody = case Type of
+        <<"read_ok">> ->
+            Value = maps:get(<<"value">>, Body),
+            maps:put(<<"value">>, Value, DefaultResponseBody);
+        <<"error">> ->
+            ErrorCode = maps:get(<<"code">>, Body),
+            maps:put(<<"code">>, ErrorCode, DefaultResponseBody);
+        _ ->
+            DefaultResponseBody
     end,
     send_msg(Client, ResponseBody, State).
 
