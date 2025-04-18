@@ -14,8 +14,7 @@ main(_Args) ->
         node_ids => [],
         msg_id => 0,
         store => #{},
-        neighbors => [],
-        node_hashes => []
+        bucket_hashes => [] % tuple of {hash, node_id}
     }).
 
 loop(State) ->
@@ -59,23 +58,25 @@ handle_init(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
     NodeId = maps:get(<<"node_id">>, Body),
     NodeIds = maps:get(<<"node_ids">>, Body, []),
-    NodeHash = sha1(NodeId),
+    NodeHashes = gen_virtual_nodes_hashes(NodeId),
     NewState = State#{
         node_id := NodeId,
         node_ids := NodeIds,
-        node_hashes := [{NodeHash, NodeId}]
+        bucket_hashes := lists:sort([{Hash, NodeId} || Hash <- NodeHashes])
     },
     FinalState = reply(Msg, <<"init_ok">>, #{}, NewState),
-    broadcast(<<"node_info">>, #{<<"node_hash">> => NodeHash}, FinalState),
+    broadcast(<<"node_info">>, #{<<"node_hashes">> => NodeHashes}, FinalState),
     FinalState.
 
 handle_node_info(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
     Sender = maps:get(<<"src">>, Msg),
-    NodeHash = maps:get(<<"node_hash">>, Body),
-    #{node_hashes := NodeHashes} = State,
-    NewNodeHashes = [{NodeHash, Sender} | NodeHashes],
-    State#{node_hashes := lists:sort(NewNodeHashes)}.
+    IncomingNodeHashes = [{Hash, Sender} || Hash <- maps:get(<<"node_hashes">>, Body)],
+    #{bucket_hashes := NodeHashes} = State,
+    % Duplicates are removed, they rarely happen so removing them is not a problem
+    NewNodeHashes = lists:usort(NodeHashes ++ IncomingNodeHashes),
+    print("Node info update: ~p~n", [NewNodeHashes]),
+    State#{bucket_hashes := NewNodeHashes}.
 
 handle_forward_result(Msg, State) ->
     Body = maps:get(<<"body">>, Msg),
