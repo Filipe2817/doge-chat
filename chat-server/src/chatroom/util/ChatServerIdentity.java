@@ -1,4 +1,4 @@
-package message;
+package chatroom.util;
 
 public record ChatServerIdentity (int port){
 

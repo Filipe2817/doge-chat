@@ -1,4 +1,6 @@
-package message;
+package chatroom.message;
+
+import chatroom.util.ChatServerIdentity;
 
 import java.util.ArrayList;
 import java.util.List;

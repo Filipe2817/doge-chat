@@ -1,9 +1,10 @@
-package message;
+package chatroom.message;
 
+import chatroom.util.ChatServerIdentity;
+import chatroom.util.VectorClock;
 import client.User;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
 public class Message {
 
@@ -12,7 +13,7 @@ public class Message {
     private User user;
     //Just for display purposes, not used in logic
     private LocalDateTime timestamp;
-    //Vector clock when message was sent
+    //Vector clock when chatroom.message was sent
     private VectorClock vectorClock;
 
     public Message(String message, User user, LocalDateTime timestamp, VectorClock vectorClock) {
@@ -30,8 +31,8 @@ public class Message {
         return vectorClock;
     }
 
-    //Compares two messages in regards to their message order
-    //Returns -1 if this message is before the other, 1 if this message is after the other, and 0 if they are the same
+    //Compares two messages in regards to their chatroom.message order
+    //Returns -1 if this chatroom.message is before the other, 1 if this chatroom.message is after the other, and 0 if they are the same
     public int compare(Message other, ChatServerIdentity self, ChatServerIdentity sender) {
         //Compare the vector clocks
         int vectorClockComparison = vectorClock.compare(other.vectorClock);

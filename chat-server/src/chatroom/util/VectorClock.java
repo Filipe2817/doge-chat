@@ -1,7 +1,9 @@
-package message;
+package chatroom.util;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class VectorClock {
 
@@ -20,6 +22,10 @@ public class VectorClock {
 
     public void update(ChatServerIdentity server, Integer value) {
         vectorClock.put(server, value);
+    }
+
+    public Integer get(ChatServerIdentity server) {
+        return vectorClock.getOrDefault(server, 0);
     }
 
     //Compares this vector clock to another vector clock
@@ -48,6 +54,16 @@ public class VectorClock {
             return 1; //This vector clock is after the other
         } else {
             return 0; //They are concurrent
+        }
+    }
+
+    public void join(VectorClock other) {
+        Set<ChatServerIdentity> servers = new HashSet<>(vectorClock.keySet());
+        servers.addAll(other.vectorClock.keySet());
+        for (ChatServerIdentity server : servers) {
+            int thisValue = this.get(server);
+            int otherValue = other.get(server);
+            this.update(server, Math.max(thisValue, otherValue));
         }
     }
 }
