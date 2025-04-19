@@ -29,37 +29,14 @@ start_link(Port) ->
 	{ok, Pid}.
 
 loop(State) ->
-	%% Accept incoming connections
 	LS = State#state.listen_socket,
 	case gen_tcp:accept(LS) of
 		{ok, Socket} ->
-			%% Wait for the init message
-			{ok, BinLine} = gen_tcp:recv(Socket, 0),
-			JsonMap = json:decode(BinLine),
-			handle_request(Socket, JsonMap),
+		    {ok, Pid} = connection_sup:start_child(Socket),
+		    ok = gen_tcp:controlling_process(Socket, Pid),
+		    ok = inet:setopts(Socket, [{active, true}]),
 			loop(State);
 		{error, Reason} ->
 			io:format("Error accepting connection: ~p~n", [Reason]),
 			loop(State)
-	end.
-
-handle_request(Socket, JsonMap) ->
-	case maps:get(<<"type">>, JsonMap) of
-		<<"init">> ->
-			case maps:get(<<"client_type">>, JsonMap) of
-               <<"client">> ->
-                   io:format("Handling search node connection~n"),
-                   {ok, Pid} = connection_sup:start_child(Socket),
-                   ok = gen_tcp:controlling_process(Socket, Pid),
-                   ok = inet:setopts(Socket, [{active, true}]);
-               <<"peer">> ->
-                   io:format("Handling search client connection~n"),
-                   {ok, Pid} = connection_sup:start_child(Socket),
-                   ok = gen_tcp:controlling_process(Socket, Pid),
-                   ok = inet:setopts(Socket, [{active, true}]);
-				_ ->
-					io:format("Unknown client type~n")
-			end;
-		_ ->
-			io:format("Unknown connection type~n")
 	end.

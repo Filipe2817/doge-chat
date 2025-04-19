@@ -1,17 +1,28 @@
 -module(client_conn).
+-include("../protocol/proto.hrl").
 
 -export([start_link/1]).
 
 start_link(Socket) ->
+    % inet:setopts(Socket, [{active, once}]),
+	ok = inet:setopts(Socket, [{packet, 4}, {active, once}]),
 	Pid = spawn(fun() -> loop(Socket) end),
 	{ok, Pid}.
 
 loop(Socket) ->
-    inet:setopts(Socket, [{active, once}]),
     receive
-        {tcp, Socket, Data} ->
-            process_message(Socket, Data),
-            loop(Socket);  %% loop again
+        {tcp, Socket, WireBin} ->
+            case safe_decode(WireBin) of
+                {ok, MsgRec} ->
+                    handle_command(Socket, MsgRec),
+                    loop(Socket);
+                {error, Reason} ->
+                    error_logger:error_msg("Bad packet: ~p~n", [Reason]),
+                    gen_tcp:send(Socket,
+                                 codec:encode(
+                                   proto:get_resp(error, <<>>, <<>>))),
+                    loop(Socket)
+            end;
 
         {tcp_closed, Socket} ->
             io:format("Socket closed~n"),
@@ -23,41 +34,43 @@ loop(Socket) ->
             gen_tcp:close(Socket),
             ok;
 
+        %% Any other message sent to this process
         Other ->
             io:format("Unknown message: ~p~n", [Other]),
             loop(Socket)
     end.
 
-process_message(Socket, Data) ->
-    Command = clean_data(Data),
-    case Command of
-        ["GET", Key] ->
-            io:format("Handling GET request for key: ~p~n", [Key]),
-            Value = state_manager:get(Key),
-            Reply = case Value of
-                        not_found -> "not_found\n";
-                        _ -> Value ++ "\n"
-                    end,
-            gen_tcp:send(Socket, Reply);
+%%--------------------------------------------------------------------
+%% Business logic – record based
+%%--------------------------------------------------------------------
 
-        ["PUT", Key, Value] ->
-            CleanValue = trim_newline(Value),
-            state_manager:put(Key, CleanValue),
-            io:format("Stored key-value pair: ~p -> ~p~n", [Key, CleanValue]),
-            gen_tcp:send(Socket, "ok\n");
+handle_command(Socket, #get{key = Key}) ->
+    ReplyRec =
+        case state_manager:get(Key) of
+            not_found       -> proto:get_resp(not_found, Key, <<>>);
+            {error, _Rsn}   -> proto:get_resp(error,     Key, <<>>);
+            Value           -> proto:get_resp(ok,        Key, Value)
+        end,
+    gen_tcp:send(Socket, codec:encode(ReplyRec));
 
-        _ ->
-            io:format("Invalid command: ~p~n", [Command]),
-            gen_tcp:send(Socket, "Invalid command\n")
+handle_command(Socket, #set{client_type = _Ct,
+                            key = Key,
+                            value = Val}) ->
+    ok      = state_manager:put(Key, Val),
+    Reply   = proto:get_resp(ok, Key, Val),
+    gen_tcp:send(Socket, codec:encode(Reply));
+
+handle_command(Socket, UnknownRec) ->
+    io:format("Unknown packet: ~p~n", [UnknownRec]),
+    ErrorRec = proto:get_resp(error, <<>>, <<>>),
+    gen_tcp:send(Socket, codec:encode(ErrorRec)).
+
+%%--------------------------------------------------------------------
+%% Helpers
+%%--------------------------------------------------------------------
+safe_decode(Bin) ->
+    try
+        {ok, codec:decode(Bin)}
+    catch
+        _:Err -> {error, Err}
     end.
-
-clean_data(Data) ->
-    RawParts = string:tokens(binary_to_list(Data), " "),
-    lists:map(fun string:trim/1, RawParts).
-
-trim_newline(Str) ->
-    case lists:reverse(Str) of
-        [$\n | Rest] -> lists:reverse(Rest);
-        _ -> Str
-    end.
-
