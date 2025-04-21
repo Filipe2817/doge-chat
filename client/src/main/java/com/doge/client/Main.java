@@ -38,7 +38,7 @@ public class Main implements Callable<Integer> {
 
             PushEndpoint pushEndpoint = new PushEndpoint(context);
             pushEndpoint.connectSocket("localhost", this.chatServerPort);
-            console.debug("Connected to PULL socket on port " + this.chatServerPort + "for sending messages to chat server");
+            console.debug("Connected to PULL socket on port " + this.chatServerPort + " for sending messages to chat server");
             System.out.println("Connect to chat server PULL socket on port " + this.chatServerPort);
 
             SubEndpoint subEndpoint = new SubEndpoint(context);
