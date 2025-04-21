@@ -2,18 +2,18 @@ package com.doge.client.command;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.PusherSocketWrapper;
+import com.doge.client.socket.PushEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.MessageWrapper;
 
 public class SendMessageCommand extends AbstractCommand {
     private final Client client;
-    private final PusherSocketWrapper pusherWrapper;
+    private final PushEndpoint pushEndpoint;
 
-    public SendMessageCommand(Client client, PusherSocketWrapper socketWrapper) {
+    public SendMessageCommand(Client client, PushEndpoint pushEndpoint) {
         super("/send", "<message>");
         this.client = client;
-        this.pusherWrapper = socketWrapper;
+        this.pushEndpoint = pushEndpoint;
     }
 
     @Override
@@ -28,7 +28,8 @@ public class SendMessageCommand extends AbstractCommand {
         String topic = client.getCurrentTopic();
 
         MessageWrapper wrapper = createChatMessageWrapper(message, clientId, topic);
-        this.pusherWrapper.sendMessage(topic, wrapper);
+        // FIXME: Why is the topic needed here? Can't it be inside the message?
+        this.pushEndpoint.send(topic, wrapper);
         console.info("Sent message: " + message + " to topic: " + topic);
     }
 

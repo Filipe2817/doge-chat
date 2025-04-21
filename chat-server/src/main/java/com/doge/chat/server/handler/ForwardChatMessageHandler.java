@@ -1,18 +1,18 @@
 package com.doge.chat.server.handler;
 
 import com.doge.chat.server.Logger;
-import com.doge.chat.server.socket.PublisherSocketWrapper;
-import com.doge.common.Handler;
+import com.doge.chat.server.socket.PubEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.ForwardChatMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.socket.MessageHandler;
 
-public class ForwardChatMessageHandler implements Handler {
-    private final PublisherSocketWrapper clientPublisherWrapper;
+public class ForwardChatMessageHandler implements MessageHandler<MessageWrapper> {
+    private final PubEndpoint clientPubEndpoint;
     private final Logger logger;
 
-    public ForwardChatMessageHandler(PublisherSocketWrapper clientPublisherWrapper, Logger logger) {
-        this.clientPublisherWrapper = clientPublisherWrapper;
+    public ForwardChatMessageHandler(PubEndpoint clientPubEndpoint, Logger logger) {
+        this.clientPubEndpoint = clientPubEndpoint;
         this.logger = logger;
     }
 
@@ -25,7 +25,7 @@ public class ForwardChatMessageHandler implements Handler {
         logger.info("Received forwarded message from " + chatMessage.getClientId() + ": " + chatMessage.getContent() + " on topic " + topic);
 
         MessageWrapper messageWrapper = createMessageWrapper(chatMessage);
-        clientPublisherWrapper.sendMessage(topic, messageWrapper);
+        clientPubEndpoint.send(topic, messageWrapper);
 
         logger.info("Sent message to topic " + topic);
     }

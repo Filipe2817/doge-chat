@@ -4,11 +4,10 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
-import org.zeromq.ZMQ;
 
-import com.doge.chat.server.socket.PublisherSocketWrapper;
-import com.doge.chat.server.socket.PullerSocketWrapper;
-import com.doge.chat.server.socket.SubscriberSocketWrapper;
+import com.doge.chat.server.socket.PubEndpoint;
+import com.doge.chat.server.socket.PullEndpoint;
+import com.doge.chat.server.socket.SubEndpoint;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -22,9 +21,9 @@ public class Main implements Callable<Integer> {
     @Option(names = "-p",
         description = """
         First port for the chat server to listen on.
-        Puller will use this port.
-        Publisher will use this port + 1 for clients.
-        Publisher will use this port + 2 for other chat servers.
+        PULL will use this port.
+        PUB will use this port + 1 for clients.
+        PUB will use this port + 2 for other chat servers.
         """,
         defaultValue = "5555"
     )
@@ -42,36 +41,35 @@ public class Main implements Callable<Integer> {
     public Integer call() throws Exception {
         ZContext context = null;
         try {
+            Logger logger = new Logger();
             context = new ZContext();
 
-            ZMQ.Socket puller = PullerSocketWrapper.createSocket(context);
-            PullerSocketWrapper.bindSocket(puller, "localhost", this.port);
-            System.out.println("Puller bound to port " + this.port);
-            PullerSocketWrapper pullerWrapper = new PullerSocketWrapper(puller);
-
-            ZMQ.Socket subscriber = SubscriberSocketWrapper.createSocket(context);
+            PullEndpoint pullEndpoint = new PullEndpoint(context);
+            pullEndpoint.bindSocket("localhost", this.port);
+            logger.debug("PULL socket bound to port " + this.port + " for receiving messages from clients");
+            
+            SubEndpoint subEndpoint = new SubEndpoint(context);
             for (Integer port : this.chatServerPorts) {
-                SubscriberSocketWrapper.connectSocket(subscriber, "localhost", port);
-                System.out.println("Subscriber connected to port " + port);
+                subEndpoint.connectSocket("localhost", port);
+                logger.debug("SUB socket connected to port " + port + " for receiving messages from other chat servers");
             }
-            SubscriberSocketWrapper subscriberWrapper = new SubscriberSocketWrapper(subscriber);
 
-            ZMQ.Socket clientPublisher = PublisherSocketWrapper.createSocket(context);
-            PublisherSocketWrapper.bindSocket(clientPublisher, "localhost", this.port + 1);
-            System.out.println("Client publisher bound to port " + (this.port + 1));
-            PublisherSocketWrapper clientPublisherWrapper = new PublisherSocketWrapper(clientPublisher);
+            PubEndpoint clientPubEndpoint = new PubEndpoint(context);
+            clientPubEndpoint.bindSocket("localhost", this.port + 1);
+            logger.debug("PUB socket bound to port " + (this.port + 1) + " for sending messages to clients");
 
-            ZMQ.Socket chatServerPublisher = PublisherSocketWrapper.createSocket(context);
-            PublisherSocketWrapper.bindSocket(chatServerPublisher, "localhost", this.port + 2);
-            System.out.println("Chat server publisher bound to port " + (this.port + 2));
-            PublisherSocketWrapper chatServerPublisherWrapper = new PublisherSocketWrapper(chatServerPublisher);
+            PubEndpoint chatServerPubEndpoint = new PubEndpoint(context);
+            chatServerPubEndpoint.bindSocket("localhost", this.port + 2);
+            logger.debug("PUB socket bound to port " + (this.port + 2) + " for sending messages to other chat servers");
+
 
             ChatServer chatServer = new ChatServer(
                 topic,
-                pullerWrapper,
-                subscriberWrapper,
-                clientPublisherWrapper,
-                chatServerPublisherWrapper
+                pullEndpoint,
+                subEndpoint,
+                clientPubEndpoint,
+                chatServerPubEndpoint,
+                logger
             );
             chatServer.run();
 

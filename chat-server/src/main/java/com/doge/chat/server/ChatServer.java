@@ -2,45 +2,45 @@ package com.doge.chat.server;
 
 import com.doge.chat.server.handler.ChatMessageHandler;
 import com.doge.chat.server.handler.ForwardChatMessageHandler;
-import com.doge.chat.server.socket.PublisherSocketWrapper;
-import com.doge.chat.server.socket.PullerSocketWrapper;
-import com.doge.chat.server.socket.SubscriberSocketWrapper;
+import com.doge.chat.server.socket.PubEndpoint;
+import com.doge.chat.server.socket.PullEndpoint;
+import com.doge.chat.server.socket.SubEndpoint;
 import com.doge.common.exception.HandlerNotFoundException;
+import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
-import com.google.protobuf.InvalidProtocolBufferException;
 
 public class ChatServer {
     private volatile boolean running;
     private final String topic;
 
-    private PullerSocketWrapper pullerWrapper;
-    private SubscriberSocketWrapper subscriberWrapper;
-    private PublisherSocketWrapper clientPublisherWrapper;
-    private PublisherSocketWrapper chatServerPublisherWrapper;
+    private PullEndpoint pullEndpoint;
+    private SubEndpoint subEndpoint;
+    private PubEndpoint clientPubEndpoint;
+    private PubEndpoint chatServerPubEndpoint;
 
     private final Logger logger;
 
     public ChatServer(
         String topic,
-        PullerSocketWrapper pullerWrapper, 
-        SubscriberSocketWrapper subscriberWrapper,
-        PublisherSocketWrapper clientPublisherWrapper,
-        PublisherSocketWrapper chatServerPublisherWrapper
+        PullEndpoint pullEndpoint,
+        SubEndpoint subEndpoint,
+        PubEndpoint clientPubEndpoint,
+        PubEndpoint chatServerPubEndpoint,
+        Logger logger
     ) {
         this.topic = topic;
         this.running = false;
 
-        this.pullerWrapper = pullerWrapper;
-        this.subscriberWrapper = subscriberWrapper;
-        this.clientPublisherWrapper = clientPublisherWrapper;
-        this.chatServerPublisherWrapper = chatServerPublisherWrapper;
+        this.pullEndpoint = pullEndpoint;
+        this.subEndpoint = subEndpoint;
+        this.clientPubEndpoint = clientPubEndpoint;
+        this.chatServerPubEndpoint = chatServerPubEndpoint;
 
-        this.logger = new Logger();
+        this.logger = logger;
     }
 
     public void run() {
         this.running = true;
-        logger.info("Started chat server serving topic: " + this.topic);
 
         Thread pullerThread = new Thread(() -> this.runPuller(), "Puller-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
@@ -60,12 +60,12 @@ public class ChatServer {
     }
 
     private void runPuller() {
-        this.pullerWrapper.registerHandler(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this.chatServerPublisherWrapper, this.logger));
+        this.pullEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this.chatServerPubEndpoint, this.logger));
 
         while (this.running) {
             try {
-                pullerWrapper.receiveMessage();
-            } catch (HandlerNotFoundException | InvalidProtocolBufferException e) {
+                pullEndpoint.receiveOnce();
+            } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
@@ -75,15 +75,15 @@ public class ChatServer {
     }
 
     private void runSubscriber() {
-        this.subscriberWrapper.registerHandler(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.clientPublisherWrapper, this.logger));
+        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.clientPubEndpoint, this.logger));
 
-        this.subscriberWrapper.subscribe(this.topic);
+        this.subEndpoint.subscribe(this.topic);
         logger.info("Chat server is now subscribed to topic: " + this.topic);
 
         while (this.running) {
             try {
-                subscriberWrapper.receiveMessage();
-            } catch (HandlerNotFoundException | InvalidProtocolBufferException e) {
+                subEndpoint.receiveOnce();
+            } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
@@ -94,11 +94,11 @@ public class ChatServer {
 
     private void stop() {
         this.running = false;
-        
-        this.pullerWrapper.close();
-        this.subscriberWrapper.close();
-        this.clientPublisherWrapper.close();
-        this.chatServerPublisherWrapper.close();
+
+        this.pullEndpoint.close();
+        this.subEndpoint.close();
+        this.clientPubEndpoint.close();
+        this.chatServerPubEndpoint.close();
         
         logger.info("Chat server stopped");
     }

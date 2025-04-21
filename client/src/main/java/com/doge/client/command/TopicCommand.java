@@ -2,16 +2,16 @@ package com.doge.client.command;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.SubscriberSocketWrapper;
+import com.doge.client.socket.SubEndpoint;
 
 public class TopicCommand extends AbstractCommand {
     private final Client client;
-    private final SubscriberSocketWrapper subscriberWrapper;
+    private final SubEndpoint subEndpoint;
 
-    public TopicCommand(Client client, SubscriberSocketWrapper subscriberWrapper) {
+    public TopicCommand(Client client, SubEndpoint subEndpoint) {
         super("/topic", "<topic>");
         this.client = client;
-        this.subscriberWrapper = subscriberWrapper;
+        this.subEndpoint = subEndpoint;
     }
 
     @Override
@@ -23,9 +23,11 @@ public class TopicCommand extends AbstractCommand {
 
         String topic = args[0];
 
-        subscriberWrapper.unsubscribe(client.getCurrentTopic());
+        // FIXME: Changing topic is a much more complex operation
+        // this is just for testing purposes
+        subEndpoint.unsubscribe(client.getCurrentTopic());
         client.setCurrentTopic(topic);
-        subscriberWrapper.subscribe(topic);
+        subEndpoint.subscribe(topic);
         console.info("Subscribed to topic: " + topic);
     }
 }

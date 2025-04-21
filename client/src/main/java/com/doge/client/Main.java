@@ -3,10 +3,10 @@ package com.doge.client;
 import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
-import org.zeromq.ZMQ;
 
-import com.doge.client.socket.PusherSocketWrapper;
-import com.doge.client.socket.SubscriberSocketWrapper;
+import com.doge.client.socket.DhtClient;
+import com.doge.client.socket.PushEndpoint;
+import com.doge.client.socket.SubEndpoint;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -33,17 +33,28 @@ public class Main implements Callable<Integer> {
     public Integer call() throws Exception {
         ZContext context = null;
         try {
+            Console console = new Console();
             context = new ZContext();
 
-            ZMQ.Socket pusher = PusherSocketWrapper.createSocket(context);
-            PusherSocketWrapper.connectSocket(pusher, "localhost", this.chatServerPort);
-            PusherSocketWrapper pusherWrapper = new PusherSocketWrapper(pusher);
+            PushEndpoint pushEndpoint = new PushEndpoint(context);
+            pushEndpoint.connectSocket("localhost", this.chatServerPort);
+            console.debug("Connected to PULL socket on port " + this.chatServerPort + "for sending messages to chat server");
+            System.out.println("Connect to chat server PULL socket on port " + this.chatServerPort);
 
-            ZMQ.Socket subscriber = SubscriberSocketWrapper.createSocket(context);
-            SubscriberSocketWrapper.connectSocket(subscriber, "localhost", this.chatServerPort + 1);
-            SubscriberSocketWrapper subscriberWrapper = new SubscriberSocketWrapper(subscriber);
+            SubEndpoint subEndpoint = new SubEndpoint(context);
+            subEndpoint.connectSocket("localhost", this.chatServerPort + 1);
+            console.debug("Connected to PUB socket on port " + (this.chatServerPort + 1) + " for receiving messages from chat server");
 
-            Client client = new Client(pusherWrapper, subscriberWrapper);
+            Client client;
+            try {
+                DhtClient dhtClient = new DhtClient("localhost", 9000);
+                console.debug("Connected to DHT on port 9000");
+                client = new Client(pushEndpoint, subEndpoint, dhtClient, console);
+            } catch (Exception e) {
+                console.debug("Failed to connect to DHT: " + e.getMessage());
+                client = new Client(pushEndpoint, subEndpoint, null, console);
+            }
+
             client.run();
 
             return 0;
