@@ -13,7 +13,8 @@
 -define(SERVER, ?MODULE).
 
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    % supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+	supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 init([]) ->
     SupFlags = #{
@@ -42,7 +43,7 @@ init([]) ->
 
     AcceptorChild = #{
         id => acceptor,
-        start => {acceptor, start_link, [1234]},
+        start => {acceptor, start_link, [4321]},
         restart => permanent,
         shutdown => 5000,
         type => worker,

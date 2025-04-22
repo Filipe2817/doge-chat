@@ -5,15 +5,17 @@
     % smart constructors
     get/1,
     get_resp/3,
-    set/3,
+    set/2,
+	set_response/3,
 
     % predicates (optional)
     is_get/1,
     is_set/1,
-    is_get_resp/1
+    is_get_resp/1,
+	is_set_resp/1
 ]).
 -export_type([
-    get/0, get_response/0, set/0
+    get/0, get_response/0, set/0, set_response/0
 ]).
 
 %%--------------------------------------------------------------------
@@ -22,6 +24,7 @@
 -type get()          :: #get{}.
 -type get_response() :: #get_response{}.
 -type set()          :: #set{}.
+-type set_response() :: #set_response{}.
 
 %%--------------------------------------------------------------------
 %% Smart constructors
@@ -37,11 +40,13 @@ get(Key) ->
 get_resp(Status, Key, Val) when Status == ok; Status == error; Status == not_found ->
     #get_response{status = Status, key = Key, value = Val}.
 
--spec set(client | peer, binary(), binary()) -> set().
-set(client, Key, Val) ->
-    #set{client_type = client, key = Key, value = Val};
-set(peer,   Key, Val) ->
-    #set{client_type = peer,   key = Key, value = Val}.
+-spec set(binary(), binary()) -> set().
+set(Key, Val) ->
+    #set{key = Key, value = Val}.
+
+-spec set_response(ok | error, binary(), binary()) -> set_response().
+set_response(Status, Key, Val) when Status == ok; Status == error ->
+	#set_response{status = Status, key = Key, value = Val}.
 
 %%--------------------------------------------------------------------
 %% Predicates (pattern‑matching helpers)
@@ -54,3 +59,6 @@ is_set(#set{}) -> true; is_set(_) -> false.
 
 -spec is_get_resp(term())     -> boolean().
 is_get_resp(#get_response{}) -> true; is_get_resp(_) -> false.
+
+-spec is_set_resp(term())	 -> boolean().
+is_set_resp(#set_response{}) -> true; is_set_resp(_) -> false.

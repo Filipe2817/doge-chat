@@ -13,9 +13,6 @@
 -define(ST_ERROR,          <<"error">>).
 -define(ST_NOT_FOUND,      <<"not_found">>).
 
--define(CT_CLIENT,         <<"client">>).   %% client_type
--define(CT_PEER,           <<"peer">>).
-
 %% ---- packet structs (records) -------------------------------------
 -record(get, {
           key :: binary()              %% <<"mykey">>
@@ -28,9 +25,14 @@
          }).
 
 -record(set, {
-          client_type :: client | peer,
           key         :: binary(),
           value       :: binary()
          }).
+
+-record(set_response, {
+		  status :: ok | error,
+		  key    :: binary(),
+		  value  :: binary()
+		 }).
 
 -endif.

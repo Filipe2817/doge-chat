@@ -1,10 +1,9 @@
--module(client_conn).
+-module(connection).
 -include("../protocol/proto.hrl").
 
 -export([start_link/1]).
 
 start_link(Socket) ->
-    % inet:setopts(Socket, [{active, once}]),
 	ok = inet:setopts(Socket, [{packet, 4}, {active, once}]),
 	Pid = spawn(fun() -> loop(Socket) end),
 	{ok, Pid}.
@@ -53,8 +52,7 @@ handle_command(Socket, #get{key = Key}) ->
         end,
     gen_tcp:send(Socket, codec:encode(ReplyRec));
 
-handle_command(Socket, #set{client_type = _Ct,
-                            key = Key,
+handle_command(Socket, #set{key = Key,
                             value = Val}) ->
     ok      = state_manager:put(Key, Val),
     Reply   = proto:get_resp(ok, Key, Val),
