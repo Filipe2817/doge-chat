@@ -4,7 +4,7 @@
 -export([start_link/1]).
 
 start_link(Socket) ->
-    % inet:setopts(Socket, [{active, once}]),
+    io:format("New connection [~p:~p]~n", [self(), Socket]),
 	ok = inet:setopts(Socket, [{packet, 4}, {active, once}]),
 	Pid = spawn(fun() -> loop(Socket) end),
 	{ok, Pid}.
@@ -12,15 +12,18 @@ start_link(Socket) ->
 loop(Socket) ->
     receive
         {tcp, Socket, WireBin} ->
+            ok = inet:setopts(Socket, [{active, once}]),
             case safe_decode(WireBin) of
                 {ok, MsgRec} ->
                     handle_command(Socket, MsgRec),
                     loop(Socket);
                 {error, Reason} ->
                     error_logger:error_msg("Bad packet: ~p~n", [Reason]),
-                    gen_tcp:send(Socket,
-                                 codec:encode(
-                                   proto:get_resp(error, <<>>, <<>>))),
+                    gen_tcp:send(Socket, 
+                        codec:encode(
+                            proto:get_resp(error, <<>>, <<>>)
+                        )
+                    ),
                     loop(Socket)
             end;
 

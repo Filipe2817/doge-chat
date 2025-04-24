@@ -34,7 +34,6 @@ loop(State) ->
 		{ok, Socket} ->
 		    {ok, Pid} = connection_sup:start_child(Socket),
 		    ok = gen_tcp:controlling_process(Socket, Pid),
-		    ok = inet:setopts(Socket, [{active, true}]),
 			loop(State);
 		{error, Reason} ->
 			io:format("Error accepting connection: ~p~n", [Reason]),
