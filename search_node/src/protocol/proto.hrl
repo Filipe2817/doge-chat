@@ -8,29 +8,36 @@
 -define(TYPE_GET,          <<"get">>).
 -define(TYPE_GET_RESP,     <<"get_response">>).
 -define(TYPE_SET,          <<"set">>).
+-define(TYPE_SET_RESP,     <<"set_response">>).
 
 -define(ST_OK,             <<"ok">>).
 -define(ST_ERROR,          <<"error">>).
 -define(ST_NOT_FOUND,      <<"not_found">>).
 
--define(CT_CLIENT,         <<"client">>).   %% client_type
--define(CT_PEER,           <<"peer">>).
-
 %% ---- packet structs (records) -------------------------------------
 -record(get, {
-          key :: binary()              %% <<"mykey">>
-         }).
+    is_peer :: boolean(),
+    key :: binary()
+}).
 
 -record(get_response, {
-          status :: ok | error | not_found,
-          key    :: binary(),
-          value  :: binary() | undefined   %% undefined if not_found / error
-         }).
+    status :: ok | error | not_found,
+    key    :: binary(),
+    value  :: binary() | undefined   %% undefined if not_found / error
+}).
 
 -record(set, {
-          client_type :: client | peer,
-          key         :: binary(),
-          value       :: binary()
-         }).
+    is_peer :: boolean(),
+    key     :: binary(),
+    value   :: binary()
+}).
+
+-record(set_response, {
+    status :: ok | error,
+    key    :: binary(),
+    value  :: binary()
+}).
+
+%% Join and replicate
 
 -endif.

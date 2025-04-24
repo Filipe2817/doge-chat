@@ -50,17 +50,17 @@ loop(Socket) ->
 handle_command(Socket, #get{key = Key}) ->
     ReplyRec =
         case state_manager:get(Key) of
-            not_found       -> proto:get_resp(not_found, Key, <<>>);
-            {error, _Rsn}   -> proto:get_resp(error,     Key, <<>>);
+            not_found       -> proto:get_resp(not_found, Key, undefined);
+            {error, _Rsn}   -> proto:get_resp(error,     Key, undefined);
             Value           -> proto:get_resp(ok,        Key, Value)
         end,
     gen_tcp:send(Socket, codec:encode(ReplyRec));
 
-handle_command(Socket, #set{client_type = _Ct,
+handle_command(Socket, #set{is_peer = _IsPeer,
                             key = Key,
                             value = Val}) ->
     ok      = state_manager:put(Key, Val),
-    Reply   = proto:get_resp(ok, Key, Val),
+    Reply   = proto:set_resp(ok, Key, Val),
     gen_tcp:send(Socket, codec:encode(Reply));
 
 handle_command(Socket, UnknownRec) ->
@@ -71,6 +71,7 @@ handle_command(Socket, UnknownRec) ->
 %%--------------------------------------------------------------------
 %% Helpers
 %%--------------------------------------------------------------------
+
 safe_decode(Bin) ->
     try
         {ok, codec:decode(Bin)}

@@ -59,17 +59,18 @@ class KVClient:
     def get(self, key):
         message = {
             "type": "get",
+            "is_peer": False,
             "data": {
                 "key": key
             }
         }
         response = self.send_message(message)
         return response
-    
+
     def set(self, key, value):
         message = {
             "type": "set",
-            "client_type": "client",
+            "is_peer": False,
             "data": {
                 "key": key,
                 "value": value
