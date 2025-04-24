@@ -1,0 +1,28 @@
+package com.doge.client.socket;
+
+import org.zeromq.ZMQ;
+
+import com.doge.common.socket.AbstractTransport;
+
+public class ZmqPushTransport extends AbstractTransport {
+    protected final ZMQ.Socket socket;
+
+    public ZmqPushTransport(ZMQ.Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void close() {
+        this.socket.close();
+    }
+
+    @Override
+    public void send(String header, byte[] data) {
+        this.socket.send(data);
+    }
+
+    @Override
+    public byte[] receive() {
+        throw new UnsupportedOperationException("PUSH socket does not support receive operation");
+    }
+}

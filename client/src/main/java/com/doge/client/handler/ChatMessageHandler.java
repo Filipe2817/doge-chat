@@ -2,11 +2,11 @@ package com.doge.client.handler;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.common.Handler;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.socket.MessageHandler;
 
-public class ChatMessageHandler implements Handler {
+public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
     private final Client client;
     private final Console console;
 
