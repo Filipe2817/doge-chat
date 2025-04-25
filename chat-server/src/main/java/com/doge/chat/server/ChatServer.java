@@ -1,5 +1,7 @@
 package com.doge.chat.server;
 
+import com.doge.chat.server.causal.CausalDeliveryManager;
+import com.doge.chat.server.causal.VectorClockManager;
 import com.doge.chat.server.handler.ChatMessageHandler;
 import com.doge.chat.server.handler.ForwardChatMessageHandler;
 import com.doge.chat.server.socket.PubEndpoint;
@@ -11,6 +13,7 @@ import com.doge.common.proto.MessageWrapper.MessageTypeCase;
 
 public class ChatServer {
     private volatile boolean running;
+    private final int id;
     private final String topic;
 
     private PullEndpoint pullEndpoint;
@@ -18,25 +21,42 @@ public class ChatServer {
     private PubEndpoint clientPubEndpoint;
     private PubEndpoint chatServerPubEndpoint;
 
+    private VectorClockManager vectorClockManager;
+    private CausalDeliveryManager causalDeliveryManager;
+
     private final Logger logger;
 
     public ChatServer(
+        int id,
         String topic,
         PullEndpoint pullEndpoint,
         SubEndpoint subEndpoint,
         PubEndpoint clientPubEndpoint,
         PubEndpoint chatServerPubEndpoint,
+        VectorClockManager vectorClockManager,
         Logger logger
     ) {
-        this.topic = topic;
         this.running = false;
+        this.id = id;
+        this.topic = topic;
 
         this.pullEndpoint = pullEndpoint;
         this.subEndpoint = subEndpoint;
         this.clientPubEndpoint = clientPubEndpoint;
         this.chatServerPubEndpoint = chatServerPubEndpoint;
-
+        
         this.logger = logger;
+
+        this.vectorClockManager = vectorClockManager;
+        this.causalDeliveryManager = new CausalDeliveryManager(
+            this.vectorClockManager,
+            this.clientPubEndpoint,
+            this.logger
+        );
+    }
+
+    public int getId() {
+        return id;
     }
 
     public void run() {
@@ -60,7 +80,13 @@ public class ChatServer {
     }
 
     private void runPuller() {
-        this.pullEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this.chatServerPubEndpoint, this.logger));
+        this.pullEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(
+            this,
+            this.logger,
+            this.clientPubEndpoint,
+            this.chatServerPubEndpoint,
+            this.vectorClockManager
+        ));
 
         while (this.running) {
             try {
@@ -75,7 +101,10 @@ public class ChatServer {
     }
 
     private void runSubscriber() {
-        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.clientPubEndpoint, this.logger));
+        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(
+            this.logger,
+            this.causalDeliveryManager
+        ));
 
         this.subEndpoint.subscribe(this.topic);
         logger.info("Chat server is now subscribed to topic: " + this.topic);
