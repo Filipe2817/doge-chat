@@ -1,7 +1,7 @@
 -module(acceptor).
 
 % API
--export([start_link/1]).
+-export([start_link/4]).
 
 %% Struct to hold the State
 -record(state, {
@@ -9,14 +9,15 @@
 	port
 }).
 
-start_link(Port) ->
-	io:format("Starting acceptor on port ~p~n", [Port]),
+start_link(Addr, Port, _NodeName, _OtherNodes) ->
+	io:format("Starting acceptor on ~p:~p~n", [Addr, Port]),
 	Options = [
 		binary,
 		{active, false},
 		{packet, 0},
 		{reuseaddr, true},
-		{backlog, 5}
+		{backlog, 5},
+		{ip, Addr}
 	],
 
 	{ok, ListenSocket} = gen_tcp:listen(Port, Options),

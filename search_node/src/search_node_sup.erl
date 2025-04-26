@@ -7,15 +7,15 @@
 
 -behaviour(supervisor).
 
--export([start_link/0]).
+-export([start_link/4]).
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(Addr, Port, NodeName, OtherNodes) ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, {Addr, Port, NodeName, OtherNodes}).
 
-init([]) ->
+init({Addr, Port, NodeName, OtherNodes}) ->
     SupFlags = #{
         strategy => one_for_one,
         intensity => 0,
@@ -42,7 +42,7 @@ init([]) ->
 
     AcceptorChild = #{
         id => acceptor,
-        start => {acceptor, start_link, [1234]},
+        start => {acceptor, start_link, [Addr, Port, NodeName, OtherNodes]},
         restart => permanent,
         shutdown => 5000,
         type => worker,
