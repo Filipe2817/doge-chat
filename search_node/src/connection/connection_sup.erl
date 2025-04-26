@@ -19,13 +19,13 @@ init([]) ->
     {ok, {SupFlags, []}}.
 
 start_child(Socket) ->
-    ChildId = {client_conn, Socket},
+    ChildId = {connection, Socket},
     ChildSpec = #{
         id => ChildId,
-        start => {client_conn, start_link, [Socket]},
+        start => {connection, start_link, [Socket]},
         restart => transient,
         shutdown => 5000,
         type => worker,
-        modules => [client_conn]
+        modules => [connection]
     },
     supervisor:start_child(?MODULE, ChildSpec).

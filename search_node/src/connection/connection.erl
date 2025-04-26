@@ -1,4 +1,4 @@
--module(client_conn).
+-module(connection).
 -include("../protocol/proto.hrl").
 
 -export([start_link/1]).
