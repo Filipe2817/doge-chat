@@ -13,6 +13,8 @@ message ChatMessage {
 
 message ForwardChatMessage {
     ChatMessage chatMessage = 1;
+    int32 senderId = 2;
+    map<int32, int32> vectorClock = 3;
 }
 
 message MessageWrapper {

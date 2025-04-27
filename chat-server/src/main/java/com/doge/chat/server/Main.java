@@ -2,9 +2,11 @@ package com.doge.chat.server;
 
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 import org.zeromq.ZContext;
 
+import com.doge.chat.server.causal.VectorClockManager;
 import com.doge.chat.server.socket.PubEndpoint;
 import com.doge.chat.server.socket.PullEndpoint;
 import com.doge.chat.server.socket.SubEndpoint;
@@ -62,13 +64,22 @@ public class Main implements Callable<Integer> {
             chatServerPubEndpoint.bindSocket("localhost", this.port + 2);
             logger.debug("PUB socket bound to port " + (this.port + 2) + " for sending messages to other chat servers");
 
+            VectorClockManager vectorClockManager = new VectorClockManager(this.port);
+            List<Integer> chatServerPorts = this.chatServerPorts.stream()
+                .map(port -> port - 2)
+                .collect(Collectors.toList());
+            chatServerPorts.add(this.port);
+            vectorClockManager.addTopic(topic, chatServerPorts);
+            logger.debug("Vector clock manager initialized for topic: " + this.topic + " with identifiers: " + chatServerPorts);
 
             ChatServer chatServer = new ChatServer(
-                topic,
+                this.port,
+                this.topic,
                 pullEndpoint,
                 subEndpoint,
                 clientPubEndpoint,
                 chatServerPubEndpoint,
+                vectorClockManager,
                 logger
             );
             chatServer.run();
