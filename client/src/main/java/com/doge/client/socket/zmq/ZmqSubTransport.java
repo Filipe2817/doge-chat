@@ -1,16 +1,16 @@
-package com.doge.chat.server.socket;
+package com.doge.client.socket.zmq;
 
 import org.zeromq.ZMQ;
 
 import com.doge.common.socket.AbstractTransport;
 
-public class ZmqPubTransport extends AbstractTransport {
+public class ZmqSubTransport extends AbstractTransport {
     protected final ZMQ.Socket socket;
 
-    public ZmqPubTransport(ZMQ.Socket socket) {
+    public ZmqSubTransport(ZMQ.Socket socket) {
         this.socket = socket;
     }
-
+    
     @Override
     public void close() {
         this.socket.close();
@@ -18,12 +18,13 @@ public class ZmqPubTransport extends AbstractTransport {
 
     @Override
     public void send(String header, byte[] data) {
-        this.socket.sendMore(header);
-        this.socket.send(data);
+        throw new UnsupportedOperationException("SUB socket does not support send operation");
     }
 
     @Override
     public byte[] receive() {
-        throw new UnsupportedOperationException("PUB socket does not support receive operation");
+        this.socket.recvStr();
+        byte[] data = this.socket.recv(0);
+        return data;
     }
 }

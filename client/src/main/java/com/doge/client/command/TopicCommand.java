@@ -2,7 +2,7 @@ package com.doge.client.command;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.SubEndpoint;
+import com.doge.client.socket.zmq.SubEndpoint;
 
 public class TopicCommand extends AbstractCommand {
     private final Client client;

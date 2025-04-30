@@ -5,6 +5,8 @@ package com.doge.common.proto;
 option java_package = "com.doge.common.proto";
 option java_multiple_files = true;
 
+// Chat
+
 message ChatMessage {
     string topic = 1;
     string clientId = 2;
@@ -17,9 +19,25 @@ message ForwardChatMessage {
     map<int32, int32> vectorClock = 3;
 }
 
+// Commands
+
+message GetOnlineUsersMessage {
+    string topic = 1;
+    string clientId = 2;
+}
+
+message GetOnlineUsersResponseMessage {
+    repeated string onlineUsers = 1;
+}
+
+// Wrapper
+
 message MessageWrapper {
     oneof message_type {
         ChatMessage chatMessage = 1;
         ForwardChatMessage forwardChatMessage = 2;
+
+        GetOnlineUsersMessage getOnlineUsersMessage = 3;
+        GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = 4;
     }
 }

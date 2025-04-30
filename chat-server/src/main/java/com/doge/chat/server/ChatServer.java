@@ -2,11 +2,11 @@ package com.doge.chat.server;
 
 import com.doge.chat.server.causal.CausalDeliveryManager;
 import com.doge.chat.server.causal.VectorClockManager;
-import com.doge.chat.server.handler.ChatMessageHandler;
-import com.doge.chat.server.handler.ForwardChatMessageHandler;
-import com.doge.chat.server.socket.PubEndpoint;
-import com.doge.chat.server.socket.PullEndpoint;
-import com.doge.chat.server.socket.SubEndpoint;
+import com.doge.chat.server.handler.*;
+import com.doge.chat.server.socket.zmq.PubEndpoint;
+import com.doge.chat.server.socket.zmq.PullEndpoint;
+import com.doge.chat.server.socket.zmq.RepEndpoint;
+import com.doge.chat.server.socket.zmq.SubEndpoint;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
@@ -18,6 +18,7 @@ public class ChatServer {
 
     private PullEndpoint pullEndpoint;
     private SubEndpoint subEndpoint;
+    private RepEndpoint repEndpoint;
     private PubEndpoint clientPubEndpoint;
     private PubEndpoint chatServerPubEndpoint;
 
@@ -31,6 +32,7 @@ public class ChatServer {
         String topic,
         PullEndpoint pullEndpoint,
         SubEndpoint subEndpoint,
+        RepEndpoint repEndpoint,
         PubEndpoint clientPubEndpoint,
         PubEndpoint chatServerPubEndpoint,
         VectorClockManager vectorClockManager,
@@ -41,6 +43,7 @@ public class ChatServer {
         this.topic = topic;
 
         this.pullEndpoint = pullEndpoint;
+        this.repEndpoint = repEndpoint;
         this.subEndpoint = subEndpoint;
         this.clientPubEndpoint = clientPubEndpoint;
         this.chatServerPubEndpoint = chatServerPubEndpoint;
@@ -62,24 +65,28 @@ public class ChatServer {
     public void run() {
         this.running = true;
 
-        Thread pullerThread = new Thread(() -> this.runPuller(), "Puller-Thread");
+        Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
+        Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
 
         try {
-            pullerThread.start();
+            pullThread.start();
+            repThread.start();
             subscriberThread.start();
 
-            pullerThread.join();
+            pullThread.join();
+            repThread.join();
             subscriberThread.join();
         } catch (InterruptedException e) {
-            pullerThread.interrupt();
+            pullThread.interrupt();
+            repThread.interrupt();
             subscriberThread.interrupt();
         } finally {
            this.stop();
         }
     }
 
-    private void runPuller() {
+    private void runPull() {
         this.pullEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(
             this,
             this.logger,
@@ -92,7 +99,27 @@ public class ChatServer {
             try {
                 pullEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
-                logger.debug("Error while receiving message: " + e.getMessage());
+                logger.debug("[PULL] Error while receiving message: " + e.getMessage());
+                continue;
+            } catch (Exception e) {
+                break;
+            }
+        }
+    }
+
+    private void runRep() {
+        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(
+            this.logger,
+            this.repEndpoint
+
+            // TODO: Implement a UserManager to handle online users
+        ));
+
+        while (this.running) {
+            try {
+                repEndpoint.receiveOnce();
+            } catch (HandlerNotFoundException | InvalidFormatException e) {
+                logger.debug("[REP] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
                 break;
@@ -113,7 +140,7 @@ public class ChatServer {
             try {
                 subEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
-                logger.debug("Error while receiving message: " + e.getMessage());
+                logger.debug("[SUB] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
                 break;

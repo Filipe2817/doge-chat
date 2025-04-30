@@ -6,7 +6,7 @@ import com.doge.chat.server.ChatServer;
 import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.VectorClock;
 import com.doge.chat.server.causal.VectorClockManager;
-import com.doge.chat.server.socket.PubEndpoint;
+import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.ForwardChatMessage;
 import com.doge.common.proto.MessageWrapper;

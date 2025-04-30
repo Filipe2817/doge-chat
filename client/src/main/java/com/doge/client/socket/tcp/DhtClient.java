@@ -1,4 +1,4 @@
-package com.doge.client.socket;
+package com.doge.client.socket.tcp;
 
 import java.io.IOException;
 import java.net.Socket;

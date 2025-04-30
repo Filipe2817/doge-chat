@@ -1,0 +1,64 @@
+package com.doge.client.command;
+
+import java.util.List;
+
+import com.doge.client.Client;
+import com.doge.client.Console;
+import com.doge.client.socket.zmq.ReqEndpoint;
+import com.doge.common.exception.InvalidFormatException;
+import com.doge.common.proto.GetOnlineUsersMessage;
+import com.doge.common.proto.GetOnlineUsersResponseMessage;
+import com.doge.common.proto.MessageWrapper;
+
+public class OnlineUsersCommand extends AbstractCommand {
+    private final Client client;
+    private final ReqEndpoint reqEndpoint;
+
+    public OnlineUsersCommand(Client client, ReqEndpoint reqEndpoint) {
+        super("/online", "");
+        this.client = client;
+        this.reqEndpoint = reqEndpoint;
+    }
+
+    @Override
+    public void execute(Console console, String[] args) {
+        console.info("Fetching online users...");
+
+        String topic = client.getCurrentTopic();
+        String clientId = client.getId();
+
+        MessageWrapper wrapper = createGetOnlineUsersMessageWrapper(topic, clientId);
+        reqEndpoint.send(topic, wrapper);
+        
+        try {
+            MessageWrapper responseWrapper = reqEndpoint.receiveOnceWithoutHandle();
+            GetOnlineUsersResponseMessage response = responseWrapper.getGetOnlineUsersResponseMessage();
+
+            this.printOnlineUsers(console, response.getOnlineUsersList(), topic);
+        } catch (InvalidFormatException e) {
+            console.error("Error while fetching online users: " + e.getMessage());
+        }
+    }
+
+    private void printOnlineUsers(Console console, List<String> onlineUsers, String topic) {
+        if (onlineUsers.isEmpty()) {
+            console.info("No users are online for topic: " + topic);
+        } else {
+            console.info("Online users for topic " + topic + ":");
+            for (String user : onlineUsers) {
+                console.info("- " + user);
+            }
+        }
+    }
+
+    private MessageWrapper createGetOnlineUsersMessageWrapper(String topic, String clientId) {
+        GetOnlineUsersMessage getOnlineUsers = GetOnlineUsersMessage.newBuilder()
+                .setClientId(clientId)
+                .setTopic(topic)
+                .build();
+
+        return MessageWrapper.newBuilder()
+                .setGetOnlineUsersMessage(getOnlineUsers)
+                .build();
+    }
+}

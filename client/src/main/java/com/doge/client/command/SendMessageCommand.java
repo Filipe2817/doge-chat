@@ -2,7 +2,7 @@ package com.doge.client.command;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.PushEndpoint;
+import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.MessageWrapper;
 
@@ -28,6 +28,7 @@ public class SendMessageCommand extends AbstractCommand {
         String topic = client.getCurrentTopic();
 
         MessageWrapper wrapper = createChatMessageWrapper(message, clientId, topic);
+
         // FIXME: Why is the topic needed here? Can't it be inside the message?
         this.pushEndpoint.send(topic, wrapper);
         console.info("Sent message: " + message + " to topic: " + topic);

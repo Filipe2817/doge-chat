@@ -30,7 +30,7 @@ mvn -pl client exec:java -Dexec.args="-sc <port>"
 Running a chat server:
 
 ```bash
-mvn -pl chat-server exec:java -Dexec.args="--subscriber-port 5557,6557"
+mvn -pl chat-server exec:java -Dexec.args="--subscriber-ports 5558,6558"
 ```
 
 Note that these are the ports that the SUB socket will connect to, which should have PUB sockets bound to them.

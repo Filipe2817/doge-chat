@@ -7,9 +7,10 @@ import java.util.stream.Collectors;
 import org.zeromq.ZContext;
 
 import com.doge.chat.server.causal.VectorClockManager;
-import com.doge.chat.server.socket.PubEndpoint;
-import com.doge.chat.server.socket.PullEndpoint;
-import com.doge.chat.server.socket.SubEndpoint;
+import com.doge.chat.server.socket.zmq.PubEndpoint;
+import com.doge.chat.server.socket.zmq.PullEndpoint;
+import com.doge.chat.server.socket.zmq.RepEndpoint;
+import com.doge.chat.server.socket.zmq.SubEndpoint;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -24,8 +25,9 @@ public class Main implements Callable<Integer> {
         description = """
         First port for the chat server to listen on.
         PULL will use this port.
-        PUB will use this port + 1 for clients.
-        PUB will use this port + 2 for other chat servers.
+        REQ will use this port + 1 for synchronous client requests.
+        PUB will use this port + 2 for clients.
+        PUB will use this port + 3 for other chat servers.
         """,
         defaultValue = "5555"
     )
@@ -55,14 +57,18 @@ public class Main implements Callable<Integer> {
                 subEndpoint.connectSocket("localhost", port);
                 logger.debug("SUB socket connected to port " + port + " for receiving messages from other chat servers");
             }
+            
+            RepEndpoint repEndpoint = new RepEndpoint(context);
+            repEndpoint.bindSocket("localhost", this.port + 1);
+            logger.debug("REP socket bound to port " + (this.port + 1) + " for receiving synchronous messages from clients");
 
             PubEndpoint clientPubEndpoint = new PubEndpoint(context);
-            clientPubEndpoint.bindSocket("localhost", this.port + 1);
-            logger.debug("PUB socket bound to port " + (this.port + 1) + " for sending messages to clients");
+            clientPubEndpoint.bindSocket("localhost", this.port + 2);
+            logger.debug("PUB socket bound to port " + (this.port + 2) + " for sending messages to clients");
 
             PubEndpoint chatServerPubEndpoint = new PubEndpoint(context);
-            chatServerPubEndpoint.bindSocket("localhost", this.port + 2);
-            logger.debug("PUB socket bound to port " + (this.port + 2) + " for sending messages to other chat servers");
+            chatServerPubEndpoint.bindSocket("localhost", this.port + 3);
+            logger.debug("PUB socket bound to port " + (this.port + 3) + " for sending messages to other chat servers");
 
             VectorClockManager vectorClockManager = new VectorClockManager(this.port);
             List<Integer> chatServerPorts = this.chatServerPorts.stream()
@@ -77,6 +83,7 @@ public class Main implements Callable<Integer> {
                 this.topic,
                 pullEndpoint,
                 subEndpoint,
+                repEndpoint,
                 clientPubEndpoint,
                 chatServerPubEndpoint,
                 vectorClockManager,

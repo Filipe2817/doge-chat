@@ -1,13 +1,13 @@
-package com.doge.chat.server.socket;
+package com.doge.chat.server.socket.zmq;
 
 import org.zeromq.ZMQ;
 
 import com.doge.common.socket.AbstractTransport;
 
-public class ZmqPullTransport extends AbstractTransport {
+public class ZmqRepTransport extends AbstractTransport {
     protected final ZMQ.Socket socket;
 
-    public ZmqPullTransport(ZMQ.Socket socket) {
+    public ZmqRepTransport(ZMQ.Socket socket) {
         this.socket = socket;
     }
 
@@ -18,12 +18,12 @@ public class ZmqPullTransport extends AbstractTransport {
 
     @Override
     public void send(String header, byte[] data) {
-        throw new UnsupportedOperationException("PULL socket does not support send operation");
+        this.socket.send(data);
     }
 
     @Override
     public byte[] receive() {
-        byte[] data = socket.recv(0);
+        byte[] data = this.socket.recv();
         return data;
     }
 }

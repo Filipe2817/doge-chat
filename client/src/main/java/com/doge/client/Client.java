@@ -6,12 +6,13 @@ import java.util.UUID;
 import com.doge.client.command.CommandManager;
 import com.doge.client.command.ExitCommand;
 import com.doge.client.command.HelpCommand;
+import com.doge.client.command.OnlineUsersCommand;
 import com.doge.client.command.SendMessageCommand;
 import com.doge.client.command.TopicCommand;
 import com.doge.client.handler.ChatMessageHandler;
-import com.doge.client.socket.DhtClient;
-import com.doge.client.socket.PushEndpoint;
-import com.doge.client.socket.SubEndpoint;
+import com.doge.client.socket.zmq.PushEndpoint;
+import com.doge.client.socket.zmq.ReqEndpoint;
+import com.doge.client.socket.zmq.SubEndpoint;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
@@ -22,21 +23,21 @@ public class Client {
     private String currentTopic;
 
     private PushEndpoint pushEndpoint;
+    private ReqEndpoint reqEndpoint;
     private SubEndpoint subEndpoint;
-    private DhtClient dhtClient;
 
     private Console console;
     private CommandManager commandManager;
 
-    public Client(PushEndpoint pushEndpoint, SubEndpoint subEndpoint, DhtClient dhtClient, Console console) throws IOException {
+    public Client(PushEndpoint pushEndpoint, ReqEndpoint reqEndpoint, SubEndpoint subEndpoint, Console console) throws IOException {
         this.id = UUID.randomUUID().toString();
         this.currentTopic = "default";
         this.running = false;
 
         this.pushEndpoint = pushEndpoint;
+        this.reqEndpoint = reqEndpoint;
         this.subEndpoint = subEndpoint;
-        this.dhtClient = dhtClient;
-        
+
         this.console = console;
         console.alterSystemPrint();
         this.commandManager = new CommandManager();
@@ -57,25 +58,21 @@ public class Client {
     public void run() {
         this.running = true;
 
-        System.out.println("Welcome to the Doge Chat!");
+        System.out.println("Welcome to Doge Chat!");
         System.out.println("Running client with id: " + id);
         
         Thread cliThread = new Thread(() -> this.runCli(), "Cli-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
-        Thread dhtClient = new Thread(() -> this.runDhtClient(), "Dht-Client-Thread");
-        
+
         try {
             cliThread.start(); 
             subscriberThread.start();
-            dhtClient.start();
 
             cliThread.join(); 
             subscriberThread.join();
-            dhtClient.join();
         } catch (InterruptedException e) {
             cliThread.interrupt();
             subscriberThread.interrupt();
-            dhtClient.interrupt();
             this.stop();
         } 
     }
@@ -88,6 +85,7 @@ public class Client {
         this.commandManager.registerCommand(helpCommand);
         
         this.commandManager.registerCommand(new ExitCommand(this));
+        this.commandManager.registerCommand(new OnlineUsersCommand(this, reqEndpoint));
 
         // Display help on startup
         helpCommand.execute(this.console, null);
@@ -124,22 +122,11 @@ public class Client {
         }
     }
 
-    public void runDhtClient() {
-        while (this.running) {
-            // this.dhtClient.asyncGet("Rui");
-
-            // try {
-            //     Thread.sleep(1000);
-            // } catch (InterruptedException e) {
-            //     console.error("Dht Clint interrupted: " + e.getMessage());
-            // }
-        }
-    }
-
     public void stop() {
         this.running = false;
 
         this.pushEndpoint.close();
+        this.reqEndpoint.close();
         this.subEndpoint.close();
 
         try {

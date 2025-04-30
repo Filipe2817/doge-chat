@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class VectorClock {
+    // TODO: Should this be a ConcurrentHashMap?
     private Map<Integer, Integer> data;
 
     public VectorClock(List<Integer> servers) {

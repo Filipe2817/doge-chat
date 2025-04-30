@@ -1,4 +1,4 @@
-package com.doge.client.socket;
+package com.doge.client.socket.zmq;
 
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
