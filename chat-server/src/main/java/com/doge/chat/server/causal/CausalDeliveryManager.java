@@ -40,18 +40,21 @@ public class CausalDeliveryManager {
             String topic = chatMessage.getTopic();
             int senderId = forwardChatMessage.getSenderId();
 
-            VectorClock selfVectorClock = vectorClockManager.getByTopic(topic);
+            VectorClock selfVectorClock = this.vectorClockManager.getByTopic(topic);
+            logger.debug("Self vector clock for topic '" + topic + "' is: " + selfVectorClock);
+
             VectorClock messageVectorClock = new VectorClock(forwardChatMessage.getVectorClockMap());
+            logger.debug("Message vector clock for topic '" + topic + "' is: " + messageVectorClock);
 
             String clientId = chatMessage.getClientId();
             if (canDeliver(selfVectorClock, messageVectorClock, senderId)) {
                 logger.info("Delivering message from client '" + clientId + "' to topic '" + topic + "'");
 
                 MessageWrapper wrapper = createChatMessageFromForwardChatMessage(forwardChatMessage);
-                clientPubEndpoint.send(topic, wrapper);
+                this.clientPubEndpoint.send(topic, wrapper);
 
                 it.remove();
-                vectorClockManager.incrementForTopic(topic, senderId);
+                this.vectorClockManager.incrementForTopic(topic, senderId);
                 maybeDeliver();
             } else {
                 logger.info("Message from client '" + clientId + "' to topic '" + topic + "' is not deliverable yet");

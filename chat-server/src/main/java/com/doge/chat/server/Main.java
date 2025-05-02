@@ -76,7 +76,7 @@ public class Main implements Callable<Integer> {
 
             VectorClockManager vectorClockManager = new VectorClockManager(this.port);
             List<Integer> chatServerPorts = this.chatServerPorts.stream()
-                .map(port -> port - 2)
+                .map(port -> port - 3)
                 .collect(Collectors.toList());
             chatServerPorts.add(this.port);
             vectorClockManager.addTopic(topic, chatServerPorts);

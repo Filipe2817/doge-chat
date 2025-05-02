@@ -25,15 +25,19 @@ public class ExitCommand extends AbstractCommand {
             return;
         }
 
-        MessageWrapper exitMessage = createExitMessage();
+        String topic = client.getCurrentTopic();
+        String clientId = client.getId();
+
+        MessageWrapper exitMessage = createExitMessage(topic, clientId);
         this.pushEndpoint.send(exitMessage);
 
         this.client.stop();
     }
 
-    private MessageWrapper createExitMessage() {
+    private MessageWrapper createExitMessage(String topic, String clientId) {
         ExitMessage exitMessage = ExitMessage.newBuilder()
-                .setClientId(client.getId())
+                .setTopic(topic)
+                .setClientId(clientId)
                 .build();
 
         return MessageWrapper.newBuilder()

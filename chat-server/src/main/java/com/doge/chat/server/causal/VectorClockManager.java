@@ -16,16 +16,16 @@ public class VectorClockManager {
     }
 
     public VectorClock getByTopic(String topic) {
-        return vectorClocksPerTopic.get(topic);
+        return this.vectorClocksPerTopic.get(topic);
     }
 
     public void addTopic(String topic, List<Integer> servers) {
         VectorClock vectorClock = new VectorClock(servers);
-        vectorClocksPerTopic.put(topic, vectorClock);
+        this.vectorClocksPerTopic.put(topic, vectorClock);
     }
 
     public void incrementForTopic(String topic, @ServerIdType int server) {
-        VectorClock vectorClock = vectorClocksPerTopic.get(topic);
+        VectorClock vectorClock = this.vectorClocksPerTopic.get(topic);
         if (vectorClock == null) {
             throw new IllegalArgumentException("Topic " + topic + " not found");
         }
@@ -33,7 +33,7 @@ public class VectorClockManager {
     }
 
     public void selfIncrementForTopic(String topic) {
-        VectorClock vectorClock = vectorClocksPerTopic.get(topic);
+        VectorClock vectorClock = this.vectorClocksPerTopic.get(topic);
         if (vectorClock == null) {
             throw new IllegalArgumentException("Topic " + topic + " not found");
         }

@@ -7,6 +7,7 @@ import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
 import com.doge.chat.server.socket.zmq.SubEndpoint;
+import com.doge.chat.server.user.UserManager;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
@@ -24,6 +25,7 @@ public class ChatServer {
 
     private VectorClockManager vectorClockManager;
     private CausalDeliveryManager causalDeliveryManager;
+    private UserManager userManager;
 
     private final Logger logger;
 
@@ -49,13 +51,15 @@ public class ChatServer {
         this.chatServerPubEndpoint = chatServerPubEndpoint;
         
         this.logger = logger;
-
+        
         this.vectorClockManager = vectorClockManager;
         this.causalDeliveryManager = new CausalDeliveryManager(
             this.vectorClockManager,
             this.clientPubEndpoint,
             this.logger
         );
+
+        this.userManager = new UserManager();
     }
 
     public int getId() {
@@ -67,7 +71,7 @@ public class ChatServer {
 
         Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
         Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
-        Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
+        Thread subscriberThread = new Thread(() -> this.runSub(), "Sub-Thread");
 
         try {
             pullThread.start();
@@ -95,11 +99,11 @@ public class ChatServer {
             this.vectorClockManager
         ));
 
-        this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(this.logger));
+        this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(this.logger, this.chatServerPubEndpoint, this.userManager));
 
         while (this.running) {
             try {
-                pullEndpoint.receiveOnce();
+                this.pullEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;
@@ -110,12 +114,17 @@ public class ChatServer {
     }
 
     private void runRep() {
-        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(this.logger, this.repEndpoint));
-        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(this.logger, this.repEndpoint));
+        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(this.logger, this.repEndpoint, this.userManager));
+        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
+            this.logger, 
+            this.chatServerPubEndpoint, 
+            this.repEndpoint, 
+            this.userManager
+        ));
 
         while (this.running) {
             try {
-                repEndpoint.receiveOnce();
+                this.repEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[REP] Error while receiving message: " + e.getMessage());
                 continue;
@@ -125,15 +134,16 @@ public class ChatServer {
         }
     }
 
-    private void runSubscriber() {
+    private void runSub() {
         this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.logger, this.causalDeliveryManager));
+        this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(this.logger, this.userManager));
 
         this.subEndpoint.subscribe(this.topic);
         logger.info("Chat server is now part of topic " + "'" + this.topic + "'");
 
         while (this.running) {
             try {
-                subEndpoint.receiveOnce();
+                this.subEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[SUB] Error while receiving message: " + e.getMessage());
                 continue;

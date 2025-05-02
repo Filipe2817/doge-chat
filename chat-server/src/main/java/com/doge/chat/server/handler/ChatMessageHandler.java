@@ -46,10 +46,10 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         this.clientPubEndpoint.send(topic, wrapper);
 
         this.vectorClockManager.selfIncrementForTopic(topic);
-        logger.debug("Incremented self vector clock for topic " + "'" + topic + "'");
+        VectorClock currenVectorClock = this.vectorClockManager.getByTopic(topic);
+        logger.debug("Incremented self vector clock for topic " + "'" + topic + "'. Clock is now: " + currenVectorClock);
 
-        VectorClock vectorClock = this.vectorClockManager.getByTopic(topic);
-        MessageWrapper forward = createForwardMessage(chatMessage, vectorClock.asData());
+        MessageWrapper forward = createForwardMessage(chatMessage, currenVectorClock.asData());
         this.chatServerPubEndpoint.send(topic, forward);
 
         logger.info("Forwarded message to topic '" + topic + "' with content: " + content);

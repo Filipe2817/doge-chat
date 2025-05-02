@@ -14,7 +14,7 @@ public class VectorClock {
     public VectorClock(List<Integer> servers) {
         this.data = new HashMap<>();
         for (int server : servers) {
-            data.put(server, 0);
+            this.data.put(server, 0);
         }
     }
 
@@ -27,19 +27,20 @@ public class VectorClock {
     }
 
     public int get(@ServerIdType int server) {
-        if (!data.containsKey(server)) {
+        if (!this.data.containsKey(server)) {
             throw new IllegalArgumentException("Server " + server + " not found in vector clock");
         }
 
-        return data.get(server);
+        return this.data.get(server);
     }
 
     public void increment(@ServerIdType int server) {
-        if (!data.containsKey(server)) {
+        if (!this.data.containsKey(server)) {
             throw new IllegalArgumentException("Server " + server + " not found in vector clock");
         }
 
-        data.put(server, data.get(server) + 1);
+        int current = this.data.get(server);
+        this.data.put(server, current + 1);
     }
 
     public boolean isCausalDeliverable(VectorClock other, @ServerIdType int server) {
@@ -131,7 +132,7 @@ public class VectorClock {
     public String toString() {
         StringBuilder sb = new StringBuilder("[");
 
-        Iterator<Map.Entry<Integer, Integer>> it = data.entrySet().iterator();
+        Iterator<Map.Entry<Integer, Integer>> it = this.data.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Integer, Integer> entry = it.next();
             sb.append(entry.getKey()).append(':').append(entry.getValue());
