@@ -22,7 +22,7 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         String content = chatMessage.getContent();
 
         if (clientId.equals(client.getId())) {
-            console.info("[You] " + content);
+            console.info("[YOU] " + content);
         } else {
             console.info("[" + clientId + "] " + content);
         }

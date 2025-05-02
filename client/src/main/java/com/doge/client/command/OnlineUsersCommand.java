@@ -12,26 +12,33 @@ import com.doge.common.proto.MessageWrapper;
 
 public class OnlineUsersCommand extends AbstractCommand {
     private final Client client;
+
     private final ReqEndpoint reqEndpoint;
 
     public OnlineUsersCommand(Client client, ReqEndpoint reqEndpoint) {
-        super("/online", "");
+        super("/online");
         this.client = client;
+        
         this.reqEndpoint = reqEndpoint;
     }
 
     @Override
     public void execute(Console console, String[] args) {
+        if (args.length > 0) {
+            sendUsage(console);
+            return;
+        }
+
         console.info("Fetching online users...");
 
         String topic = client.getCurrentTopic();
         String clientId = client.getId();
 
-        MessageWrapper wrapper = createGetOnlineUsersMessageWrapper(topic, clientId);
-        reqEndpoint.send(topic, wrapper);
+        MessageWrapper wrapper = this.createGetOnlineUsersMessage(topic, clientId);
+        this.reqEndpoint.send(topic, wrapper);
         
         try {
-            MessageWrapper responseWrapper = reqEndpoint.receiveOnceWithoutHandle();
+            MessageWrapper responseWrapper = this.reqEndpoint.receiveOnceWithoutHandle();
             GetOnlineUsersResponseMessage response = responseWrapper.getGetOnlineUsersResponseMessage();
 
             this.printOnlineUsers(console, response.getOnlineUsersList(), topic);
@@ -42,16 +49,16 @@ public class OnlineUsersCommand extends AbstractCommand {
 
     private void printOnlineUsers(Console console, List<String> onlineUsers, String topic) {
         if (onlineUsers.isEmpty()) {
-            console.info("No users are online for topic: " + topic);
+            console.info("No users are online for topic " + "'" + topic + "'");
         } else {
-            console.info("Online users for topic " + topic + ":");
+            console.info("Online users for topic " + "'" + topic + "':");
             for (String user : onlineUsers) {
                 console.info("- " + user);
             }
         }
     }
 
-    private MessageWrapper createGetOnlineUsersMessageWrapper(String topic, String clientId) {
+    private MessageWrapper createGetOnlineUsersMessage(String topic, String clientId) {
         GetOnlineUsersMessage getOnlineUsers = GetOnlineUsersMessage.newBuilder()
                 .setClientId(clientId)
                 .setTopic(topic)

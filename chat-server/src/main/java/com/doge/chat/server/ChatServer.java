@@ -95,6 +95,8 @@ public class ChatServer {
             this.vectorClockManager
         ));
 
+        this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(this.logger));
+
         while (this.running) {
             try {
                 pullEndpoint.receiveOnce();
@@ -108,12 +110,8 @@ public class ChatServer {
     }
 
     private void runRep() {
-        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(
-            this.logger,
-            this.repEndpoint
-
-            // TODO: Implement a UserManager to handle online users
-        ));
+        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(this.logger, this.repEndpoint));
+        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(this.logger, this.repEndpoint));
 
         while (this.running) {
             try {
@@ -128,13 +126,10 @@ public class ChatServer {
     }
 
     private void runSubscriber() {
-        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(
-            this.logger,
-            this.causalDeliveryManager
-        ));
+        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.logger, this.causalDeliveryManager));
 
         this.subEndpoint.subscribe(this.topic);
-        logger.info("Chat server is now subscribed to topic: " + this.topic);
+        logger.info("Chat server is now part of topic " + "'" + this.topic + "'");
 
         while (this.running) {
             try {

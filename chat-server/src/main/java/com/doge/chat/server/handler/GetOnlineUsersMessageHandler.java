@@ -26,21 +26,21 @@ public class GetOnlineUsersMessageHandler implements MessageHandler<MessageWrapp
         String topic = getOnlineUsersMessage.getTopic();
         String clientId = getOnlineUsersMessage.getClientId();
 
-        logger.info("Received request for online users from " + clientId + " on topic " + topic);
+        logger.info("Received request for online users from '" + clientId + "' on topic '" + topic + "'");
 
-        // TODO: Send response back to the client with the list of online users
+        // FIXME: Send response back to the client with the list of really online users
         List<String> onlineUsers = List.of("Rui", "Pedro");
-        MessageWrapper responseMessage = createGetOnlineUsersResponseMessage(onlineUsers);
-        repEndpoint.send(responseMessage);
+        MessageWrapper response = createGetOnlineUsersResponseMessage(onlineUsers);
+        this.repEndpoint.send(response);
     }
 
     private MessageWrapper createGetOnlineUsersResponseMessage(List<String> onlineUsers) {
-        GetOnlineUsersResponseMessage responseMessage = GetOnlineUsersResponseMessage.newBuilder()
+        GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = GetOnlineUsersResponseMessage.newBuilder()
                 .addAllOnlineUsers(onlineUsers)
                 .build();
 
         return MessageWrapper.newBuilder()
-                .setGetOnlineUsersResponseMessage(responseMessage)
+                .setGetOnlineUsersResponseMessage(getOnlineUsersResponseMessage)
                 .build();
     }
 }

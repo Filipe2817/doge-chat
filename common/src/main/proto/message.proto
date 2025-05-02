@@ -30,6 +30,26 @@ message GetOnlineUsersResponseMessage {
     repeated string onlineUsers = 1;
 }
 
+// Control
+
+message AnnounceMessage {
+    string clientId = 1;
+    string topic = 2;
+}
+
+message AnnounceResponseMessage {
+    enum Status {
+        SUCCESS = 0;
+        FAILURE = 1;
+    }
+
+    Status status = 1;
+}
+
+message ExitMessage {
+    string clientId = 1;
+}
+
 // Wrapper
 
 message MessageWrapper {
@@ -39,5 +59,9 @@ message MessageWrapper {
 
         GetOnlineUsersMessage getOnlineUsersMessage = 3;
         GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = 4;
+
+        AnnounceMessage announceMessage = 5;
+        AnnounceResponseMessage announceResponseMessage = 6;
+        ExitMessage exitMessage = 7;
     }
 }

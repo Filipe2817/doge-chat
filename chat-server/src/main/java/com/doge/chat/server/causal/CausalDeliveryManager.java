@@ -41,25 +41,20 @@ public class CausalDeliveryManager {
             int senderId = forwardChatMessage.getSenderId();
 
             VectorClock selfVectorClock = vectorClockManager.getByTopic(topic);
-            logger.debug("Self vector clock: " + selfVectorClock);
-            
             VectorClock messageVectorClock = new VectorClock(forwardChatMessage.getVectorClockMap());
-            logger.debug("Message vector clock: " + messageVectorClock);
 
             String clientId = chatMessage.getClientId();
             if (canDeliver(selfVectorClock, messageVectorClock, senderId)) {
-                logger.info("Delivering message from client: " + clientId + " to topic: " + topic);
+                logger.info("Delivering message from client '" + clientId + "' to topic '" + topic + "'");
 
-                MessageWrapper wrapper = createChatMessageWrapper(forwardChatMessage);
+                MessageWrapper wrapper = createChatMessageFromForwardChatMessage(forwardChatMessage);
                 clientPubEndpoint.send(topic, wrapper);
-
-                logger.info("Delivered message to topic " + topic + " from client " + clientId);
 
                 it.remove();
                 vectorClockManager.incrementForTopic(topic, senderId);
                 maybeDeliver();
             } else {
-                logger.info("Message from client " + clientId + " is not deliverable yet");
+                logger.info("Message from client '" + clientId + "' to topic '" + topic + "' is not deliverable yet");
             }
         }
     }
@@ -68,7 +63,7 @@ public class CausalDeliveryManager {
         return selfVectorClock.isCausalDeliverable(messageVectorClock, senderId) || selfVectorClock.isConcurrent(messageVectorClock);
     }
 
-    private MessageWrapper createChatMessageWrapper(ForwardChatMessage message) {
+    private MessageWrapper createChatMessageFromForwardChatMessage(ForwardChatMessage message) {
         return MessageWrapper.newBuilder()
                 .setChatMessage(message.getChatMessage())
                 .build();

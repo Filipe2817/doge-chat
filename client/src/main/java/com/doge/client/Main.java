@@ -39,15 +39,15 @@ public class Main implements Callable<Integer> {
 
             PushEndpoint pushEndpoint = new PushEndpoint(context);
             pushEndpoint.connectSocket("localhost", this.chatServerPort);
-            console.debug("Connected to PULL socket on port " + this.chatServerPort + " for sending messages to chat server");
+            console.debug("Connected to PULL socket on port " + this.chatServerPort);
             
             ReqEndpoint reqEndpoint = new ReqEndpoint(context);
             reqEndpoint.connectSocket("localhost", this.chatServerPort + 1);
-            console.debug("Connected to REP socket on port " + (this.chatServerPort + 1) + " for sending synchronous messages to chat server");
+            console.debug("Connected to REP socket on port " + this.chatServerPort + 1);
 
             SubEndpoint subEndpoint = new SubEndpoint(context);
             subEndpoint.connectSocket("localhost", this.chatServerPort + 2);
-            console.debug("Connected to PUB socket on port " + (this.chatServerPort + 2) + " for receiving messages from chat server");
+            console.debug("Connected to PUB socket on port " + this.chatServerPort + 2);
 
             Client client;
             client = new Client(pushEndpoint, reqEndpoint, subEndpoint, console);

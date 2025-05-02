@@ -8,11 +8,13 @@ import com.doge.common.proto.MessageWrapper;
 
 public class SendMessageCommand extends AbstractCommand {
     private final Client client;
+
     private final PushEndpoint pushEndpoint;
 
     public SendMessageCommand(Client client, PushEndpoint pushEndpoint) {
         super("/send", "<message>");
         this.client = client;
+
         this.pushEndpoint = pushEndpoint;
     }
 
@@ -27,14 +29,14 @@ public class SendMessageCommand extends AbstractCommand {
         String clientId = client.getId();
         String topic = client.getCurrentTopic();
 
-        MessageWrapper wrapper = createChatMessageWrapper(message, clientId, topic);
-
         // FIXME: Why is the topic needed here? Can't it be inside the message?
+        MessageWrapper wrapper = createChatMessage(message, clientId, topic);
         this.pushEndpoint.send(topic, wrapper);
-        console.info("Sent message: " + message + " to topic: " + topic);
+        
+        console.info("Sent message to topic '" + topic + "'");
     }
 
-    private MessageWrapper createChatMessageWrapper(String message, String clientId, String topic) {
+    private MessageWrapper createChatMessage(String message, String clientId, String topic) {
         ChatMessage chatMessage = ChatMessage.newBuilder()
                 .setClientId(client.getId())
                 .setTopic(topic)

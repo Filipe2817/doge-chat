@@ -23,9 +23,11 @@ public class ForwardChatMessageHandler implements MessageHandler<MessageWrapper>
         ForwardChatMessage forwardChatMessage = wrapper.getForwardChatMessage();
         ChatMessage chatMessage = forwardChatMessage.getChatMessage();
         String topic = chatMessage.getTopic();
+        String clientId = chatMessage.getClientId();
+        String content = chatMessage.getContent();
 
-        logger.info("Received forwarded message from " + chatMessage.getClientId() + ": " + chatMessage.getContent() + " on topic " + topic);
+        logger.info("Received forwarded message from '" + clientId + "' on topic '" + topic + "' with content: " + content);
 
-        causalDeliveryManager.addAndMaybeDeliver(forwardChatMessage);
+        this.causalDeliveryManager.addAndMaybeDeliver(forwardChatMessage);
     }
 }

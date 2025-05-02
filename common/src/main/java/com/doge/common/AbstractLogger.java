@@ -3,26 +3,20 @@ package com.doge.common;
 import java.io.PrintStream;
 
 public abstract class AbstractLogger {
-    private final String formatString = "[%s] %s";
-
     public void info(String message) {
-        print(format("INFO", message));
+        this.print(format("INFO", message));
     }
     
     public void warn(String message) {
-        print(format("WARN", message));
+        this.print(format("WARN", message));
     }
 
     public void error(String message) {
-        print(format("ERROR", message));
+        this.print(format("ERROR", message));
     }
 
     public void debug(String message) {
-        print(format("DEBUG", message));
-    }
-
-    private String format(String level, String message) {
-        return String.format(this.formatString, level, message);
+        this.print(format("DEBUG", message));
     }
 
     public void alterSystemPrint() {
@@ -40,6 +34,8 @@ public abstract class AbstractLogger {
             }
         });
     }
-
+    
     protected abstract void print(String message);
+
+    protected abstract String format(String level, String message);
 }

@@ -39,21 +39,23 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
     public void handle(MessageWrapper wrapper) {
         ChatMessage chatMessage = wrapper.getChatMessage();
         String topic = chatMessage.getTopic();
+        String clientId = chatMessage.getClientId();
+        String content = chatMessage.getContent();
 
-        logger.info("Received message from " + chatMessage.getClientId() + ": " + chatMessage.getContent() + " on topic " + topic);
-        clientPubEndpoint.send(topic, wrapper);
+        logger.info("Received message from '" + clientId + "' on topic '" + topic + "' with content: " + content);
+        this.clientPubEndpoint.send(topic, wrapper);
 
-        vectorClockManager.selfIncrementForTopic(topic);
-        logger.debug("Incremented self vector clock for topic " + topic);
+        this.vectorClockManager.selfIncrementForTopic(topic);
+        logger.debug("Incremented self vector clock for topic " + "'" + topic + "'");
 
-        VectorClock vectorClock = vectorClockManager.getByTopic(topic);
-        MessageWrapper forwardWrapper = createForwardMessageWrapper(chatMessage, vectorClock.asData());
-        chatServerPubEndpoint.send(topic, forwardWrapper);
+        VectorClock vectorClock = this.vectorClockManager.getByTopic(topic);
+        MessageWrapper forward = createForwardMessage(chatMessage, vectorClock.asData());
+        this.chatServerPubEndpoint.send(topic, forward);
 
-        logger.info("Forwarded message to topic " + topic + " with vector clock: " + vectorClock);
+        logger.info("Forwarded message to topic '" + topic + "' with content: " + content);
     }
 
-    private MessageWrapper createForwardMessageWrapper(ChatMessage chatMessage, Map<Integer, Integer> vectorClockData) {
+    private MessageWrapper createForwardMessage(ChatMessage chatMessage, Map<Integer, Integer> vectorClockData) {
         ForwardChatMessage forwardChatMessage = ForwardChatMessage.newBuilder()
                 .setChatMessage(chatMessage)
                 .setSenderId(chatServer.getId())

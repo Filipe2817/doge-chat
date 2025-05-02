@@ -8,13 +8,15 @@ import com.doge.client.command.ExitCommand;
 import com.doge.client.command.HelpCommand;
 import com.doge.client.command.OnlineUsersCommand;
 import com.doge.client.command.SendMessageCommand;
-import com.doge.client.command.TopicCommand;
 import com.doge.client.handler.ChatMessageHandler;
 import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.client.socket.zmq.ReqEndpoint;
 import com.doge.client.socket.zmq.SubEndpoint;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
+import com.doge.common.proto.AnnounceMessage;
+import com.doge.common.proto.AnnounceResponseMessage;
+import com.doge.common.proto.MessageWrapper;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
 
 public class Client {
@@ -58,8 +60,11 @@ public class Client {
     public void run() {
         this.running = true;
 
-        System.out.println("Welcome to Doge Chat!");
-        System.out.println("Running client with id: " + id);
+        console.info("Welcome to Doge Chat!");
+        console.info("Running client with id: " + id);
+        
+        console.info("Announcing to server...");
+        this.maybeAnnounceToServer();
         
         Thread cliThread = new Thread(() -> this.runCli(), "Cli-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
@@ -75,17 +80,16 @@ public class Client {
             subscriberThread.interrupt();
             this.stop();
         } 
-    }
+    } 
 
     private void runCli() {
         this.commandManager.registerCommand(new SendMessageCommand(this, this.pushEndpoint));
-        this.commandManager.registerCommand(new TopicCommand(this, this.subEndpoint));
         
         HelpCommand helpCommand = new HelpCommand(this.commandManager);
         this.commandManager.registerCommand(helpCommand);
         
-        this.commandManager.registerCommand(new ExitCommand(this));
-        this.commandManager.registerCommand(new OnlineUsersCommand(this, reqEndpoint));
+        this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
+        this.commandManager.registerCommand(new OnlineUsersCommand(this, this.reqEndpoint));
 
         // Display help on startup
         helpCommand.execute(this.console, null);
@@ -108,17 +112,46 @@ public class Client {
         this.subEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this, this.console));
 
         this.subEndpoint.subscribe(this.currentTopic);
-        console.info("You are now subscribed to topic: " + this.currentTopic);
+        console.info("You are now subscribed to topic " + "'" + this.currentTopic + "'");
         
         while (this.running) {
             try {
                 this.subEndpoint.receiveOnce();
             } catch (HandlerNotFoundException | InvalidFormatException e) {
-                console.debug("Error while receiving message: " + e.getMessage());
+                console.debug("[SUB] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
                 break;
             }
+        }
+    }
+
+    private void maybeAnnounceToServer() {
+        AnnounceMessage announceMessage = AnnounceMessage.newBuilder()
+                .setClientId(this.id)
+                .setTopic(this.currentTopic)
+                .build();
+
+        MessageWrapper messageWrapper = MessageWrapper.newBuilder()
+                .setAnnounceMessage(announceMessage)
+                .build();
+
+        this.reqEndpoint.send(messageWrapper);
+
+        try {
+            MessageWrapper response = this.reqEndpoint.receiveOnceWithoutHandle();
+            AnnounceResponseMessage announceResponseMessage = response.getAnnounceResponseMessage();
+
+            if (announceResponseMessage.getStatus() != AnnounceResponseMessage.Status.SUCCESS) {
+                console.error("Failed to announce to server. Exiting...");
+                this.stop();
+                return;
+            }
+
+            console.info("Successfully announced to server. You are now online!");
+        } catch (InvalidFormatException e) {
+            console.error("[REQ] Error while receiving connect response: " + e.getMessage());
+            return;
         }
     }
 
@@ -135,6 +168,6 @@ public class Client {
             System.err.println("Error while closing console: " + e.getMessage());
         }
 
-        console.info("Client stopped");
+        console.info("Client stopped. Exiting...");
     }
 }

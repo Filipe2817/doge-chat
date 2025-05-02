@@ -37,7 +37,7 @@ public class CommandManager {
 
         Command command = this.getCommand(commandName);
         if (command == null) {
-            console.error(commandName + " is not a valid command. Type /help for a list of commands.");
+            console.error(commandName + " is not a valid command. Type /help for a list of commands");
             return;
         }
 

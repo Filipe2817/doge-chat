@@ -48,27 +48,31 @@ public class Main implements Callable<Integer> {
             Logger logger = new Logger();
             context = new ZContext();
 
+            int pullPort = this.port;
             PullEndpoint pullEndpoint = new PullEndpoint(context);
-            pullEndpoint.bindSocket("localhost", this.port);
-            logger.debug("PULL socket bound to port " + this.port + " for receiving messages from clients");
+            pullEndpoint.bindSocket("localhost", pullPort);
+            logger.debug("PULL socket bound to port " + pullPort);
             
             SubEndpoint subEndpoint = new SubEndpoint(context);
             for (Integer port : this.chatServerPorts) {
                 subEndpoint.connectSocket("localhost", port);
-                logger.debug("SUB socket connected to port " + port + " for receiving messages from other chat servers");
+                logger.debug("SUB socket connected to port " + port);
             }
             
+            int repPort = this.port + 1;
             RepEndpoint repEndpoint = new RepEndpoint(context);
-            repEndpoint.bindSocket("localhost", this.port + 1);
-            logger.debug("REP socket bound to port " + (this.port + 1) + " for receiving synchronous messages from clients");
+            repEndpoint.bindSocket("localhost", repPort);
+            logger.debug("REP socket bound to port " + repPort);
 
+            int clientPubPort = this.port + 2;
             PubEndpoint clientPubEndpoint = new PubEndpoint(context);
-            clientPubEndpoint.bindSocket("localhost", this.port + 2);
-            logger.debug("PUB socket bound to port " + (this.port + 2) + " for sending messages to clients");
+            clientPubEndpoint.bindSocket("localhost", clientPubPort);
+            logger.debug("Client PUB socket bound to port " + clientPubPort);
 
+            int chatServerPubPort = this.port + 3;
             PubEndpoint chatServerPubEndpoint = new PubEndpoint(context);
-            chatServerPubEndpoint.bindSocket("localhost", this.port + 3);
-            logger.debug("PUB socket bound to port " + (this.port + 3) + " for sending messages to other chat servers");
+            chatServerPubEndpoint.bindSocket("localhost", chatServerPubPort);
+            logger.debug("ChatServer PUB socket bound to port " + chatServerPubPort);
 
             VectorClockManager vectorClockManager = new VectorClockManager(this.port);
             List<Integer> chatServerPorts = this.chatServerPorts.stream()
@@ -76,7 +80,7 @@ public class Main implements Callable<Integer> {
                 .collect(Collectors.toList());
             chatServerPorts.add(this.port);
             vectorClockManager.addTopic(topic, chatServerPorts);
-            logger.debug("Vector clock manager initialized for topic: " + this.topic + " with identifiers: " + chatServerPorts);
+            logger.debug("Vector clock manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
 
             ChatServer chatServer = new ChatServer(
                 this.port,

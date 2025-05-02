@@ -37,9 +37,14 @@ public class Console extends AbstractLogger {
     public void close() throws IOException {
         reader.getTerminal().close();
     }
-    
+
     @Override
     protected void print(String message) {
         reader.printAbove(message);
+    }
+
+    @Override
+    protected String format(String level, String message) {
+        return String.format("[%s] %s", level, message);
     }
 }

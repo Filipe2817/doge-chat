@@ -16,7 +16,7 @@ public class HelpCommand extends AbstractCommand {
     public void execute(Console console, String[] args) {
         console.info("Available commands:");
 
-        commandManager.getCommands()
+        this.commandManager.getCommands()
             .stream()
             .sorted(Comparator.comparing(Command::getName))
             .forEach(command -> console.info(" - " + command.getUsage()));
