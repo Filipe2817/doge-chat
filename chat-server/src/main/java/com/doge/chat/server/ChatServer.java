@@ -38,6 +38,7 @@ public class ChatServer {
         PubEndpoint clientPubEndpoint,
         PubEndpoint chatServerPubEndpoint,
         VectorClockManager vectorClockManager,
+        UserManager userManager,
         Logger logger
     ) {
         this.running = false;
@@ -58,8 +59,7 @@ public class ChatServer {
             this.clientPubEndpoint,
             this.logger
         );
-
-        this.userManager = new UserManager();
+        this.userManager = userManager;
     }
 
     public int getId() {
@@ -108,6 +108,7 @@ public class ChatServer {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
+                e.printStackTrace();
                 break;
             }
         }
@@ -129,6 +130,7 @@ public class ChatServer {
                 logger.debug("[REP] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
+                e.printStackTrace();
                 break;
             }
         }
@@ -148,6 +150,7 @@ public class ChatServer {
                 logger.debug("[SUB] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
+                e.printStackTrace();
                 break;
             }
         }

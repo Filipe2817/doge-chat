@@ -11,6 +11,7 @@ import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
 import com.doge.chat.server.socket.zmq.SubEndpoint;
+import com.doge.chat.server.user.UserManager;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -75,12 +76,18 @@ public class Main implements Callable<Integer> {
             logger.debug("ChatServer PUB socket bound to port " + chatServerPubPort);
 
             VectorClockManager vectorClockManager = new VectorClockManager(this.port);
+            UserManager userManager = new UserManager(this.port);
+            
             List<Integer> chatServerPorts = this.chatServerPorts.stream()
                 .map(port -> port - 3)
                 .collect(Collectors.toList());
             chatServerPorts.add(this.port);
+            
             vectorClockManager.addTopic(topic, chatServerPorts);
             logger.debug("Vector clock manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
+
+            userManager.addTopic(topic, chatServerPorts);
+            logger.debug("User manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
 
             ChatServer chatServer = new ChatServer(
                 this.port,
@@ -91,6 +98,7 @@ public class Main implements Callable<Integer> {
                 clientPubEndpoint,
                 chatServerPubEndpoint,
                 vectorClockManager,
+                userManager,
                 logger
             );
             chatServer.run();

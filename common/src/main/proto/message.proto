@@ -51,7 +51,18 @@ message ExitMessage {
     string topic = 2;
 }
 
+
 message ForwardUserOnlineMessage {
+    message DotMessage {
+        int32 serverId = 1;
+        int32 clock = 2;
+    }
+
+    // DotSet
+    message DotStoreMessage {
+        repeated DotMessage dot = 1;
+    }
+
     string clientId = 1;
     string topic = 2;
 
@@ -61,6 +72,11 @@ message ForwardUserOnlineMessage {
     }
 
     Status status = 3;
+
+    map<int32, int32> vectorClock = 4;
+
+    // Map from @UserIdType to DotSet
+    map<string, DotStoreMessage> dotStore = 5;
 }
 
 // Wrapper

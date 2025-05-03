@@ -1,6 +1,12 @@
 package com.doge.chat.server.handler;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.doge.chat.server.Logger;
+import com.doge.chat.server.causal.VectorClock;
+import com.doge.chat.server.user.DotSet;
+import com.doge.chat.server.user.DotStore;
+import com.doge.chat.server.user.OnlineUsersORSet;
 import com.doge.chat.server.user.UserManager;
 import com.doge.common.proto.ForwardUserOnlineMessage;
 import com.doge.common.proto.MessageWrapper;
@@ -19,18 +25,25 @@ public class ForwardUserOnlineMessageHandler implements MessageHandler<MessageWr
 
     @Override
     public void handle(MessageWrapper wrapper) {
-        ForwardUserOnlineMessage forwardUserOnlineMessage = wrapper.getForwardUserOnlineMessage();
-        String clientId = forwardUserOnlineMessage.getClientId();
-        String topic = forwardUserOnlineMessage.getTopic();
+        logger.info("Started handling ForwardUserOnlineMessage");
 
-        logger.info("Received forwarded user online message from '" + clientId + "' on topic '" + topic + "'");
+        ForwardUserOnlineMessage message = wrapper.getForwardUserOnlineMessage();
+        String topic = message.getTopic();
 
-        if (forwardUserOnlineMessage.getStatus() == ForwardUserOnlineMessage.Status.ONLINE) {
-            userManager.addUserToTopic(topic, clientId);
-            logger.info("Client '" + clientId + "' is now online on topic '" + topic + "'");
-        } else {
-            userManager.removeUserFromTopic(topic, clientId);
-            logger.info("Client '" + clientId + "' is now offline on topic '" + topic + "'");
-        }
+        DotStore incomingDotStore = new DotStore();
+        message.getDotStoreMap().forEach((key, dotStoreMessage) -> {
+            DotSet dotSet = new DotSet();
+            for (ForwardUserOnlineMessage.DotMessage d : dotStoreMessage.getDotList()) {
+                dotSet.addDot(Pair.of(d.getServerId(), d.getClock()));
+            }
+            incomingDotStore.put(key, dotSet);
+        });
+
+        VectorClock incomingVectorClock = new VectorClock(message.getVectorClockMap());
+        OnlineUsersORSet incomingState = new OnlineUsersORSet(incomingDotStore, incomingVectorClock);
+
+        userManager.updateDotStoreForTopic(topic, incomingState);
+
+        logger.info("Finished handling ForwardUserOnlineMessage for topic: " + topic);
     }
 }

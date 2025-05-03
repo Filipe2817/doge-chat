@@ -44,12 +44,12 @@ public class VectorClock {
     }
 
     public boolean isCausalDeliverable(VectorClock other, @ServerIdType int server) {
-       /**
-        * For all k != j (where j is the server of incoming message)
-        * if Vm[k] (incoming message) <= V[k] then we can deliver the message
-        *
-        * V[j] + 1 should also be equal to Vm[j]
-        */
+        // For all k != j (where j is the server of incoming message)
+        // if Vm[k] (incoming message) <= V[k] then we can deliver the message
+        // V[j] + 1 should also be equal to Vm[j]
+        //
+        // V[j] + 1 should also be equal to Vm[j]
+
         if (!other.data.containsKey(server)) {
             throw new IllegalArgumentException("Server " + server + " not found in vector clock");
         }
@@ -79,12 +79,10 @@ public class VectorClock {
     }
 
     public boolean isConcurrent(VectorClock other) {
-        /**
-         * Two vector clocks are said to be concurrent iff
-         * neither self <= other nor other <= self
-         * 
-         * That is, the two clocks are incomparable
-         */
+        // Two vector clocks are said to be concurrent iff
+        // neither self <= other nor other <= self
+        // 
+        // That is, the two clocks are incomparable
         boolean selfLeqOther = true;
         boolean otherLeqSelf = true;
 
@@ -115,11 +113,8 @@ public class VectorClock {
         Set<Integer> all = new HashSet<>(this.data.keySet());
         all.addAll(other.data.keySet());
 
+        // Pointwise maximum of both vector clocks
         for (Integer server : all) {
-            /**
-             * We will take the maximum value of both vector clocks, as this is the
-             * only way to ensure that we have the most recent value
-             */
             int selfValue = this.data.getOrDefault(server, 0);
             int otherValue = other.data.getOrDefault(server, 0);
 
