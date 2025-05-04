@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class LogsManager {
@@ -49,6 +50,38 @@ public class LogsManager {
             return Collections.emptyList();
         }
         return logs.subList(from, to);
+    }
+
+    public List<ForwardChatMessage> getLastLogsSlice(Integer length) {
+        int listLen = logs.size();
+        return getLogsSlice(listLen - length, listLen);
+    }
+
+    public List<ForwardChatMessage> getLogsSliceFromUser(Integer from,Integer to, String userId) {
+        if (from == null){
+            from = 0;
+        }
+        if(to == null){
+            to = logs.size();
+        }
+        if (from < 0 || to > logs.size() || from > to) {
+            System.out.println("Invalid range");
+            return Collections.emptyList();
+        }
+        List<ForwardChatMessage> logsDup = new ArrayList<>(logs);
+        List<ForwardChatMessage> userLogs = logsDup.stream().filter(log -> log.getChatMessage().getClientId().equals(userId)).collect(Collectors.toList());
+        return userLogs.subList(from, to);
+    }
+
+    public List<ForwardChatMessage> getLastLogsSliceFromUser(Integer length, String userId) {
+        int listLen = logs.size();
+        return getLogsSliceFromUser(listLen - length, listLen, userId);
+    }
+
+    public List<ForwardChatMessage> getLogsFromUser(String userId) {
+        List<ForwardChatMessage> logsDup = new ArrayList<>(logs);
+        List<ForwardChatMessage> userLogs = logsDup.stream().filter(log -> log.getChatMessage().getClientId().equals(userId)).collect(Collectors.toList());
+        return userLogs;
     }
 
     public List<ForwardChatMessage> getLogs() {
