@@ -37,7 +37,13 @@ public class LogsManager {
     }
 
     //TODO?: Make the slice selectable by timestamp?
-    public List<ForwardChatMessage> getLogsSlice(int from, int to) {
+    public List<ForwardChatMessage> getLogsSlice(Integer from, Integer to) {
+        if (from == null){
+            from = 0;
+        }
+        if(to == null){
+            to = logs.size();
+        }
         if (from < 0 || to > logs.size() || from > to) {
             System.out.println("Invalid range");
             return Collections.emptyList();
