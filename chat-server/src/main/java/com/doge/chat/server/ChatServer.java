@@ -3,6 +3,7 @@ package com.doge.chat.server;
 import com.doge.chat.server.causal.CausalDeliveryManager;
 import com.doge.chat.server.causal.VectorClockManager;
 import com.doge.chat.server.handler.*;
+import com.doge.chat.server.logs.LogsManager;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
@@ -26,6 +27,7 @@ public class ChatServer {
     private VectorClockManager vectorClockManager;
     private CausalDeliveryManager causalDeliveryManager;
     private UserManager userManager;
+    private LogsManager logsManager;
 
     private final Logger logger;
 
@@ -39,7 +41,8 @@ public class ChatServer {
         PubEndpoint chatServerPubEndpoint,
         VectorClockManager vectorClockManager,
         UserManager userManager,
-        Logger logger
+        Logger logger,
+        LogsManager logsManager
     ) {
         this.running = false;
         this.id = id;
@@ -52,12 +55,14 @@ public class ChatServer {
         this.chatServerPubEndpoint = chatServerPubEndpoint;
         
         this.logger = logger;
-        
+        this.logsManager = logsManager;
+
         this.vectorClockManager = vectorClockManager;
         this.causalDeliveryManager = new CausalDeliveryManager(
             this.vectorClockManager,
             this.clientPubEndpoint,
-            this.logger
+            this.logger,
+            this.logsManager
         );
         this.userManager = userManager;
     }
@@ -96,7 +101,8 @@ public class ChatServer {
             this.logger,
             this.clientPubEndpoint,
             this.chatServerPubEndpoint,
-            this.vectorClockManager
+            this.vectorClockManager,
+            this.logsManager
         ));
 
         this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(this.logger, this.chatServerPubEndpoint, this.userManager));

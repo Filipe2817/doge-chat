@@ -42,12 +42,12 @@ public class Main implements Callable<Integer> {
             console.debug("Connected to PULL socket on port " + this.chatServerPort);
             
             ReqEndpoint reqEndpoint = new ReqEndpoint(context);
-            reqEndpoint.connectSocket("localhost", this.chatServerPort + 1);
-            console.debug("Connected to REP socket on port " + this.chatServerPort + 1);
+            reqEndpoint.connectSocket("localhost", (this.chatServerPort + 1));
+            console.debug("Connected to REP socket on port " + (this.chatServerPort + 1));
 
             SubEndpoint subEndpoint = new SubEndpoint(context);
-            subEndpoint.connectSocket("localhost", this.chatServerPort + 2);
-            console.debug("Connected to PUB socket on port " + this.chatServerPort + 2);
+            subEndpoint.connectSocket("localhost", (this.chatServerPort + 2));
+            console.debug("Connected to PUB socket on port " + (this.chatServerPort + 2));
 
             Client client;
             client = new Client(pushEndpoint, reqEndpoint, subEndpoint, console);

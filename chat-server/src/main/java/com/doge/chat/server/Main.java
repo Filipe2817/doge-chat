@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import com.doge.chat.server.logs.LogsManager;
 import org.zeromq.ZContext;
 
 import com.doge.chat.server.causal.VectorClockManager;
@@ -89,6 +90,8 @@ public class Main implements Callable<Integer> {
             userManager.addTopic(topic, chatServerPorts);
             logger.debug("User manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
 
+            LogsManager logsManager = new LogsManager();
+
             ChatServer chatServer = new ChatServer(
                 this.port,
                 this.topic,
@@ -99,7 +102,8 @@ public class Main implements Callable<Integer> {
                 chatServerPubEndpoint,
                 vectorClockManager,
                 userManager,
-                logger
+                logger,
+                logsManager
             );
             chatServer.run();
 
