@@ -1,15 +1,15 @@
 -module(acceptor).
 
 % API
--export([start_link/4]).
+-export([start_link/2]).
 
 %% Struct to hold the State
--record(state, {
-	listen_socket,
-	port
-}).
+%-record(state, {
+%	listen_socket,
+%	port
+%}).
 
-start_link(Addr, Port, _NodeName, _OtherNodes) ->
+start_link(Addr, Port) ->
 	io:format("Starting acceptor on ~p:~p~n", [Addr, Port]),
 	Options = [
 		binary,
@@ -19,24 +19,18 @@ start_link(Addr, Port, _NodeName, _OtherNodes) ->
 		{backlog, 5},
 		{ip, Addr}
 	],
-
 	{ok, ListenSocket} = gen_tcp:listen(Port, Options),
-	State = #state{
-		listen_socket = ListenSocket,
-		port = Port
-	},
-
-	Pid = spawn(fun() -> loop(State) end),
+	ok = connector:request_join(n1),
+	Pid = spawn(fun() -> loop(ListenSocket) end),
 	{ok, Pid}.
 
-loop(State) ->
-	LS = State#state.listen_socket,
-	case gen_tcp:accept(LS) of
+loop(LSocket) ->
+	case gen_tcp:accept(LSocket) of
 		{ok, Socket} ->
-		    {ok, Pid} = connection_sup:start_child(Socket),
-		    ok = gen_tcp:controlling_process(Socket, Pid),
-			loop(State);
+			{ok, Pid} = connection_sup:start_child(Socket),
+			ok = gen_tcp:controlling_process(Socket, Pid),
+			loop(LSocket);
 		{error, Reason} ->
 			io:format("Error accepting connection: ~p~n", [Reason]),
-			loop(State)
+			loop(LSocket)
 	end.

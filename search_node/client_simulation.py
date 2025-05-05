@@ -3,7 +3,7 @@ import json
 import struct
 
 class KVClient:
-    def __init__(self, host='localhost', port=1234):
+    def __init__(self, host='localhost', port=8000):
         self.host = host
         self.port = port
         self.socket = None

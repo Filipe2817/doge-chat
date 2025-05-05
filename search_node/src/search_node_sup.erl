@@ -12,10 +12,10 @@
 
 -define(SERVER, ?MODULE).
 
-start_link(Addr, Port, NodeName, OtherNodes) ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, {Addr, Port, NodeName, OtherNodes}).
+start_link(Addr, Port, NodeName, KnownNodes) ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, {Addr, Port, NodeName, KnownNodes}).
 
-init({Addr, Port, NodeName, OtherNodes}) ->
+init({Addr, Port, NodeName, KnownNodes}) ->
     SupFlags = #{
         strategy => one_for_one,
         intensity => 0,
@@ -24,7 +24,7 @@ init({Addr, Port, NodeName, OtherNodes}) ->
 
     StateManagerChild = #{
         id => state_manager,
-        start => {state_manager, start_link, []},
+        start => {state_manager, start_link, [NodeName, Addr, Port, KnownNodes]},
         restart => permanent,
         shutdown => 5000,
         type => worker,
@@ -42,7 +42,7 @@ init({Addr, Port, NodeName, OtherNodes}) ->
 
     AcceptorChild = #{
         id => acceptor,
-        start => {acceptor, start_link, [Addr, Port, NodeName, OtherNodes]},
+        start => {acceptor, start_link, [Addr, Port]},
         restart => permanent,
         shutdown => 5000,
         type => worker,
