@@ -79,6 +79,20 @@ message ForwardUserOnlineMessage {
     map<string, DotStoreMessage> dotStore = 5;
 }
 
+// Aggregation
+
+message PeerEntry {
+  // The network address (e.g. "tcp://host:port" or "host:port")
+  string address = 1;
+  // The age counter (0 = freshest)
+  int32 age     = 2;
+}
+
+message ShuffleMessage {
+  // The sender includes up to ℓ entries: ℓ–1 random peers plus itself at age=0
+  repeated PeerEntry entries = 1;
+}
+
 // Wrapper
 
 message MessageWrapper {
@@ -93,5 +107,7 @@ message MessageWrapper {
         AnnounceResponseMessage announceResponseMessage = 6;
         ExitMessage exitMessage = 7;
         ForwardUserOnlineMessage forwardUserOnlineMessage = 8;
+
+        ShuffleMessage shuffleMessage = 9;
     }
 }
