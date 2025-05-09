@@ -5,9 +5,11 @@ import java.util.Objects;
 import com.doge.aggregation.server.Logger;
 import com.doge.aggregation.server.socket.zmq.PullEndpoint;
 import com.doge.aggregation.server.socket.zmq.PushEndpoint;
+import com.doge.common.proto.MessageWrapper;
+
 
 public class Neighbour implements Comparable<Neighbour> {
-    private final String address;
+    private final int id;
     private int age;
 
     private PushEndpoint pushEndpoint;
@@ -15,8 +17,8 @@ public class Neighbour implements Comparable<Neighbour> {
 
     private final Logger logger;
 
-    public Neighbour(String address, PullEndpoint pullEndpoint, PushEndpoint pushEndpoint, int age, Logger logger) {
-        this.address = address;
+    public Neighbour(int id, PullEndpoint pullEndpoint, PushEndpoint pushEndpoint, int age, Logger logger) {
+        this.id = id;
         this.age = age;
 
         this.pullEndpoint = pullEndpoint;
@@ -25,20 +27,20 @@ public class Neighbour implements Comparable<Neighbour> {
         this.logger = logger;
     }
 
-    public String getAddress() {
-        return address;
+    public Integer getId() {
+        return this.id;
     }
 
     public int getAge() {
-        return age;
+        return this.age;
     }
 
     public void incrementAge() {
-        age++;
+        this.age++;
     }
 
     public void resetAge() {
-        age = 0;
+        this.age = 0;
     }
 
     @Override
@@ -46,4 +48,11 @@ public class Neighbour implements Comparable<Neighbour> {
         return Integer.compare(this.age, other.age);
     }
 
+    public void sendMessage(MessageWrapper message) {
+        try {
+            this.pushEndpoint.send(message);
+        } catch (Exception e) {
+            logger.error("Failed to send message to neighbour " + id + ": " + e.getMessage());
+        }
+    }
 }

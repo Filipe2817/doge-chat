@@ -62,6 +62,7 @@ public class AggregationServer {
             this,
             this.pullEndpoint,
             this.neighbourManager,
+            this.l,
             logger
         ));
 
