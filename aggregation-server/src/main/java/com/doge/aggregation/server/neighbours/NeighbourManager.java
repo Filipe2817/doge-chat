@@ -32,7 +32,7 @@ public class NeighbourManager {
 
     public Neighbour getOldest() {
         List<Neighbour> neighbours = new ArrayList<>(cache.values());
-        Collections.sort(neighbours);
+        Collections.sort(neighbours, Collections.reverseOrder());
         return neighbours.get(0);
     }
 
@@ -64,5 +64,17 @@ public class NeighbourManager {
 
     public int size() {
         return cache.size();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Neighbours List\n");
+        sb.append(String.format("%-10s | %-10s\n", "ID", "Age"));
+        sb.append("-----------------------------\n");
+        for (Neighbour n : cache.values()) {
+            sb.append(String.format("%-10d | %-10d\n", n.getId(), n.getAge()));
+        }
+        return sb.toString();
     }
 }

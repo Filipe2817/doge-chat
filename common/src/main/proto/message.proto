@@ -80,16 +80,20 @@ message ForwardUserOnlineMessage {
 }
 
 // Aggregation
+enum ShuffleMessageType {
+    REQUEST = 0;
+    RESPONSE = 1;
+}
 
 message PeerEntry {
-  int32 id      = 1;
-  int32 age     = 2;
+    int32 id      = 1;
+    int32 age     = 2;
 }
 
 message ShuffleMessage {
-  int32 type = 1;
-  int32 senderId = 2;
-  repeated PeerEntry entries = 3;
+    ShuffleMessageType type = 1;
+    int32 senderId = 2;
+    repeated PeerEntry entries = 3;
 }
 
 // Wrapper

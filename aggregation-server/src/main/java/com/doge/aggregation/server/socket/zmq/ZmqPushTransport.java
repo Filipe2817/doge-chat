@@ -18,8 +18,14 @@ public class ZmqPushTransport extends AbstractTransport {
 
     @Override
     public void send(String header, byte[] data) {
-        this.socket.send(data);
+        // Set a send timeout of 5000ms (5 seconds)
+        socket.setSendTimeOut(5000);
+        boolean sent = socket.send(data, 0);
+        if (!sent) {
+            throw new RuntimeException("Send timed out after 5000ms");
+        }
     }
+
 
     @Override
     public byte[] receive() {

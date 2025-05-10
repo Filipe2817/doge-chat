@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.socket.zmq.PushEndpoint;
+import com.doge.aggregation.server.neighbours.Neighbour;
 import com.doge.aggregation.server.neighbours.NeighbourManager;
 import com.doge.aggregation.server.socket.zmq.PullEndpoint;
 import com.doge.aggregation.server.AggregationServer;
@@ -42,6 +43,11 @@ public class Main implements Callable<Integer> {
     )
     private int l = 3;
 
+    @Option(names = "-i", 
+        description = "ID of the introduction server for an initial shuffle", 
+        defaultValue = "0"
+    )
+    private int introId;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new Main()).execute(args);
@@ -63,6 +69,14 @@ public class Main implements Callable<Integer> {
             NeighbourManager neighbourManager = new NeighbourManager(
                 this.c
             );
+            
+            // create introduction node
+            if (this.introId != 0) {
+                PushEndpoint pushEndpoint = new PushEndpoint(context);
+                pushEndpoint.connectSocket("localhost", introId);
+                Neighbour introductionNode = new Neighbour(introId, pullEndpoint, pushEndpoint, 0, logger);
+                neighbourManager.addNeighbour(introductionNode);
+            }
 
             AggregationServer aggregationServer = new AggregationServer(
                 this.port,

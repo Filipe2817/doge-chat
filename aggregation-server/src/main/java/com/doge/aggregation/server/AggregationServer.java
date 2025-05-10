@@ -84,17 +84,17 @@ public class AggregationServer {
         // Schedule periodic shuffle trigger every 30 seconds (for example)
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                logger.debug("Triggering shuffle...");
                 shuffleMessageHandler.triggerShuffle();
             } catch(Exception e) {
                 logger.error("Error triggering shuffle: " + e.getMessage());
             }
-        }, 10, 10, TimeUnit.SECONDS); // initial delay 10s, then every 30s
+        }, 0, 10, TimeUnit.SECONDS); // initial delay 10s, then every 30s
 
 
         while (this.running) {
             try {
                 this.pullEndpoint.receiveOnce();
+                logger.debug(neighbourManager.toString());
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;
