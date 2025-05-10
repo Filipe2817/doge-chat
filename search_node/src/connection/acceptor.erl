@@ -20,7 +20,7 @@ start_link(Addr, Port) ->
 		{ip, Addr}
 	],
 	{ok, ListenSocket} = gen_tcp:listen(Port, Options),
-	ok = connector:request_join(n1),
+	ok = request_join(n1),
 	Pid = spawn(fun() -> loop(ListenSocket) end),
 	{ok, Pid}.
 
@@ -33,4 +33,18 @@ loop(LSocket) ->
 		{error, Reason} ->
 			io:format("Error accepting connection: ~p~n", [Reason]),
 			loop(LSocket)
+	end.
+
+%%--------------------------------------------------------------------
+%% Helpers
+%%--------------------------------------------------------------------
+
+request_join(Node) ->
+	{MyId, {MyAddr, MyPort}, _} = state_manager:get_node_info(),
+	case state_manager:get_endpoint_connection(Node) of
+		not_found ->
+			io:format("Node ~p not found~n", [Node]),
+			ok;
+		Pid ->
+			connection:send_msg(Pid, proto:join_init(MyId, MyAddr, MyPort))
 	end.

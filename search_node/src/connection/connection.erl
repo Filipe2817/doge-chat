@@ -1,7 +1,7 @@
 -module(connection).
 -include("../protocol/proto.hrl").
 
--export([start_link/1]).
+-export([start_link/1, send_msg/2]).
 
 start_link(Socket) ->
     io:format("New connection [~p:~p]~n", [self(), Socket]),
@@ -67,44 +67,65 @@ handle_command(Socket, #set{is_peer = _IsPeer, key = Key, value = Val}) ->
 
 handle_command(Socket, #join_init{node_id = NodeId, address = NodeAddr, port = NodePort}) ->
     io:format("Join init from node ~p~n", [NodeId]),
-    ok = state_manager:bind_process_node(NodeId, NodeAddr, NodePort, self()),
-    {Nodes, Hashes} = state_manager:get_ring_state(),
-    Reply = proto:join_init_resp(Nodes, Hashes),
+    ok = state_manager:add_endpoint(NodeId, NodeAddr, NodePort),
+    Reply = proto:join_init_resp(
+        state_manager:get_endpoints(),
+        state_manager:get_ring()
+    ),
     gen_tcp:send(Socket, codec:encode(Reply));
 
 handle_command(_Socket, #join_init_response{nodes = Nodes, hashes = Hashes}) ->
     io:format("Join init response ~n"),
-    ok = state_manager:update_ring_state(Nodes, Hashes),
-    {MyId, MyHashes} = state_manager:get_node_info(),
-    {_, UpdatedRing} = state_manager:get_ring_state(),
+    ok = state_manager:update_endpoints(Nodes),
+    ok = state_manager:update_ring(Hashes),
+    {MyId, _, MyHashes} = state_manager:get_node_info(),
+    UpdatedRing = state_manager:get_ring(),
     Successors = dht:find_successors_range(MyHashes, UpdatedRing),
-    state_manager:debug(),
-    io:format("Successors: ~p~n", [Successors]),
     lists:foreach(
         fun({NodeId, Ranges}) ->
-            case state_manager:get_node_connection(NodeId) of
+            case state_manager:get_endpoint_connection(NodeId) of
                 not_found ->
-                    io:format("Node ~p not found in the ring~n", [NodeId]),
+                    io:format("Node ~p not found~n", [NodeId]),
                     ok;
                 Pid ->
                     Msg = proto:join_get_keys(MyId, Ranges),
-                    connector:send_msg(Pid, Msg)
+                    send_msg(Pid, Msg)
             end
         end,
         maps:to_list(Successors)
     );
 
-handle_command(_Socket, #join_get_keys{node_id = NodeId, hash_ranges = _HashRanges}) ->
+handle_command(Socket, #join_get_keys{node_id = NodeId, hash_ranges = HashRanges}) ->
     io:format("Join get keys from node ~p~n", [NodeId]),
-    ok;
-%
-%handle_command(Socket, #join_get_keys_response{keys = Keys, values = Values}) ->
-%    io:format("Received join get keys response"),
-%    ok;
-%
-%handle_command(Socket, #join_disseminate{node_id = NodeId, hashes = Hashes}) ->
-%    io:format("Join disseminate from node ~p~n", [NodeId]),
-%    ok;
+    TransferMap = state_manager:transfer_keys(HashRanges),
+    Reply = proto:join_get_keys_resp(TransferMap),
+    gen_tcp:send(Socket, codec:encode(Reply));
+
+handle_command(_Socket, #join_get_keys_response{transfer_map = TransferMap}) ->
+    io:format("Received join get keys response ~p~n", [TransferMap]),
+    ok = state_manager:update_key_map(TransferMap),
+    Nodes = state_manager:get_endpoints(),
+    {MyId, {MyAddr, MyPort}, MyHashes} = state_manager:get_node_info(),
+    lists:foreach(
+        fun({NodeId, _, _}) ->
+            case state_manager:get_endpoint_connection(NodeId) of
+                not_found ->
+                    io:format("Node ~p not found~n", [NodeId]),
+                    ok;
+                Pid ->
+                    Msg = proto:join_ready(MyId, MyAddr, MyPort, MyHashes),
+                    send_msg(Pid, Msg)
+            end
+        end,
+        Nodes
+    ),
+    state_manager:debug();
+
+handle_command(_Socket, #join_ready{node_id = NodeId, address = NodeAddr, port = NodePort, hashes = Hashes}) ->
+    io:format("Join ready from node ~p~n", [NodeId]),
+    ok = state_manager:add_endpoint(NodeId, NodeAddr, NodePort),
+    ok = state_manager:update_ring(Hashes),
+    state_manager:debug();
 
 handle_command(Socket, UnknownRec) ->
     io:format("Unknown packet: ~p~n", [UnknownRec]),
@@ -121,3 +142,7 @@ safe_decode(Bin) ->
     catch
         _:Err -> {error, Err}
     end.
+
+send_msg(Pid, Msg) ->
+    Pid ! {send, Msg},
+    ok.

@@ -12,7 +12,7 @@
     #set{} | #set_response{} | 
     #join_init{} | #join_init_response{} |
     #join_get_keys{} | #join_get_keys_response{} |
-    #join_disseminate{}) -> iodata().
+    #join_ready{}) -> iodata().
 encode(Struct) ->
     Map = struct_to_map(Struct),
 	json:encode(Map).
@@ -22,7 +22,7 @@ encode(Struct) ->
     #set{} | #set_response{} | 
     #join_init{} | #join_init_response{} |
     #join_get_keys{} | #join_get_keys_response{} |
-    #join_disseminate{} | no_return().
+    #join_ready{} | no_return().
 decode(Bin) ->
 	Map = json:decode(iolist_to_binary(Bin)),
     map_to_struct(Map).
@@ -112,23 +112,22 @@ struct_to_map(#join_get_keys{node_id = NodeId, hash_ranges = HasheRanges}) ->
         }
     };
 
-struct_to_map(#join_get_keys_response{keys = Keys, values = Values}) ->
+struct_to_map(#join_get_keys_response{transfer_map = TransferData}) ->
     #{
         <<"type">> => ?TYPE_JOIN_GET_KEYS_RESP,
-        <<"data">> => #{
-            <<"keys">> => Keys,
-            <<"values">> => Values
-        }
+        <<"data">> => TransferData
     };
 
-struct_to_map(#join_disseminate{node_id = NodeId, hashes = Hashes}) ->
+struct_to_map(#join_ready{node_id = NodeId, address = NodeAddr, port = NodePort, hashes = Hashes}) ->
     #{
-        <<"type">> => ?TYPE_JOIN_DISSEMINATE,
+        <<"type">> => ?TYPE_JOIN_READY,
         <<"data">> => #{
             <<"node_id">> => atom_to_binary(NodeId, utf8),
+            <<"node_addr">> => list_to_binary(inet:ntoa(NodeAddr)),
+            <<"node_port">> => NodePort,
             <<"hashes">> => [
                 #{
-                    <<"hash">> => Hash, 
+                    <<"hash">> => Hash,
                     <<"node">> => atom_to_binary(Node, utf8)
                 } || {Hash, Node} <- Hashes
             ]
@@ -206,18 +205,19 @@ map_to_struct(#{<<"type">> := ?TYPE_JOIN_GET_KEYS,
     };
 
 map_to_struct(#{<<"type">> := ?TYPE_JOIN_GET_KEYS_RESP,
-                <<"data">> := #{<<"keys">> := Keys, <<"values">> := Values}}) ->
+                <<"data">> := TransferData}) ->
     #join_get_keys_response{
-        keys = Keys,
-        values = Values
+        transfer_map = TransferData
     };
 
-map_to_struct(#{<<"type">> := ?TYPE_JOIN_DISSEMINATE,
-                <<"data">> := #{<<"node_id">> := NodeId, <<"hashes">> := Hashes}}) ->
-    #join_disseminate{
+map_to_struct(#{<<"type">> := ?TYPE_JOIN_READY,
+                <<"data">> := #{<<"node_id">> := NodeId, <<"node_addr">> := NodeAddr, <<"node_port">> := NodePort, <<"hashes">> := Hashes}}) ->
+    #join_ready{
         node_id = binary_to_atom(NodeId, utf8),
+        address = element(2, inet:parse_address(binary_to_list(NodeAddr))),
+        port = NodePort,
         hashes = [
-            {Hash, Node} || 
+            {Hash, binary_to_atom(Node, utf8)} || 
             #{<<"hash">> := Hash, <<"node">> := Node} <- Hashes
         ]
     };

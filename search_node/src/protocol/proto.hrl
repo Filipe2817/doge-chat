@@ -13,7 +13,7 @@
 -define(TYPE_JOIN_INIT_RESP,    <<"join_init_response">>).
 -define(TYPE_JOIN_GET_KEYS,     <<"join_get_keys">>).
 -define(TYPE_JOIN_GET_KEYS_RESP,<<"join_get_keys_response">>).
--define(TYPE_JOIN_DISSEMINATE,  <<"join_disseminate">>).
+-define(TYPE_JOIN_READY,        <<"join_ready">>).
 
 -define(ST_OK,              <<"ok">>).
 -define(ST_ERROR,           <<"error">>).
@@ -60,13 +60,14 @@
 }).
 
 -record(join_get_keys_response, {
-    keys   :: [binary()],
-    values :: [binary()]
+    transfer_map :: map()
 }).
 
--record(join_disseminate, {
+-record(join_ready, {
     node_id :: binary(),
-    hashes  :: [{binary(), binary()}]
+    address :: binary(),
+    port    :: binary(),
+    hashes :: [{binary(), binary()}] % hash, id
 }).
 
 %% replicate

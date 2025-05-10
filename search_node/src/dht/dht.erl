@@ -1,5 +1,5 @@
 -module(dht).
--export([get_responsible_node/2, gen_virtual_nodes_hashes/1, find_successors_range/2]).
+-export([get_responsible_node/2, gen_virtual_nodes_hashes/1, find_successors_range/2, divide_map_to_transfer/2]).
 
 -define(BUCKETS_PER_NODE, 3).
 
@@ -84,4 +84,35 @@ find_successors_range(MyHashes, RingHashes) ->
         end,
         #{},
         MyHashes
+    ).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+is_in_range(H, {Start,End}) when Start < End ->
+    H > Start andalso H =< End;
+
+is_in_range(H, {Start,End}) when Start > End ->
+    H > Start orelse H =< End;
+
+is_in_range(_,_) ->
+    false.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+in_any_range(H, Ranges) ->
+    lists:any(fun(R) -> is_in_range(H, R) end, Ranges).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+divide_map_to_transfer(KeyMap, Ranges) ->
+    maps:fold(
+        fun(Key, Val, {Keep, Transfer}) ->
+            H = sha1(Key),
+            case in_any_range(H, Ranges) of
+                true  -> {Keep, maps:put(Key, Val, Transfer)};
+                false -> {maps:put(Key, Val, Keep), Transfer}
+            end
+        end,
+        {#{}, #{}},
+        KeyMap
     ).

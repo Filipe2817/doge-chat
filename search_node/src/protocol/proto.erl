@@ -10,8 +10,8 @@
     join_init/3,
     join_init_resp/2,
     join_get_keys/2,
-    join_get_keys_resp/2,
-    join_disseminate/2,
+    join_get_keys_resp/1,
+    join_ready/4,
     % predicates (optional)
     is_get/1,
     is_get_resp/1,
@@ -21,7 +21,7 @@
     is_join_init_resp/1,
     is_join_get_keys/1,
     is_join_get_keys_resp/1,
-    is_join_disseminate/1
+    is_join_ready/1
 ]).
 -export_type([
     get/0, 
@@ -32,7 +32,7 @@
     join_init_response/0,
     join_get_keys/0,
     join_get_keys_response/0,
-    join_disseminate/0
+    join_ready/0
 ]).
 
 %%--------------------------------------------------------------------
@@ -47,7 +47,7 @@
 -type join_init_response()      :: #join_init_response{}.
 -type join_get_keys()           :: #join_get_keys{}.
 -type join_get_keys_response()  :: #join_get_keys_response{}.
--type join_disseminate()        :: #join_disseminate{}.
+-type join_ready()              :: #join_ready{}.
 
 %%--------------------------------------------------------------------
 %% Smart constructors
@@ -83,13 +83,13 @@ join_init_resp(Nodes, Hashes) ->
 join_get_keys(NodeId, HashRanges) ->
     #join_get_keys{node_id = NodeId, hash_ranges = HashRanges}.
 
--spec join_get_keys_resp([binary()], [binary()]) -> join_get_keys_response().
-join_get_keys_resp(Keys, Values) ->
-    #join_get_keys_response{keys = Keys, values = Values}.
+-spec join_get_keys_resp(map()) -> join_get_keys_response().
+join_get_keys_resp(TransferData) when is_map(TransferData) ->
+    #join_get_keys_response{transfer_map = TransferData}.
 
--spec join_disseminate(binary(), [{binary(), binary()}]) -> join_disseminate().
-join_disseminate(NodeId, Hashes) ->
-    #join_disseminate{node_id = NodeId, hashes = Hashes}.
+-spec join_ready(binary(), binary(), binary(), [{binary(), binary()}]) -> join_ready().
+join_ready(NodeId, Addr, Port, Hashes) ->
+    #join_ready{node_id = NodeId, address = Addr, port = Port, hashes = Hashes}.
 
 %%--------------------------------------------------------------------
 %% Predicates (pattern‑matching helpers)
@@ -119,5 +119,5 @@ is_join_get_keys(#join_get_keys{}) -> true; is_join_get_keys(_) -> false.
 -spec is_join_get_keys_resp(term()) -> boolean().
 is_join_get_keys_resp(#join_get_keys_response{}) -> true; is_join_get_keys_resp(_) -> false.
 
--spec is_join_disseminate(term()) -> boolean().
-is_join_disseminate(#join_disseminate{}) -> true; is_join_disseminate(_) -> false.
+-spec is_join_ready(term()) -> boolean().
+is_join_ready(#join_ready{}) -> true; is_join_ready(_) -> false.
