@@ -9,7 +9,7 @@ import com.doge.common.socket.Endpoint;
 
 public class PullEndpoint extends Endpoint<MessageWrapper> {
     public PullEndpoint(ZContext context) {
-        super(new ZmqPushTransport(context.createSocket(SocketType.PULL)), new ProtobufCodec());
+        super(new ZmqPullTransport(context.createSocket(SocketType.PULL)), new ProtobufCodec());
     }
 
     public void bindSocket(String address, int port) {

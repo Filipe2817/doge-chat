@@ -13,7 +13,6 @@ import com.doge.aggregation.server.AggregationServer;
 import com.doge.aggregation.server.neighbours.NeighbourManager;
 
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Main implements Callable<Integer> {
@@ -26,7 +25,22 @@ public class Main implements Callable<Integer> {
         defaultValue = "6666"
     )
     private int port = 6666;
-    private int cacheSize = 5;
+
+    @Option(names = "-c",
+        description = """
+        Size of the view for neighbours.
+        """,
+        defaultValue = "5"
+    )
+    private int c = 5;
+
+    @Option(names = "-l",
+        description = """
+        Number of peer-entries to send in the shuffle message.
+        """,
+        defaultValue = "3"
+    )
+    private int l = 3;
 
 
     public static void main(String[] args) {
@@ -47,18 +61,15 @@ public class Main implements Callable<Integer> {
             logger.debug("ROUTER socket bound to port " + pullPort);
 
             NeighbourManager neighbourManager = new NeighbourManager(
-                this.cacheSize,
-                logger,
-                pullEndpoint,
-                context
+                this.c
             );
 
             AggregationServer aggregationServer = new AggregationServer(
                 this.port,
-                this.cacheSize,
-                this.cacheSize,
-                pullEndpoint,
+                this.l,
                 neighbourManager,
+                pullEndpoint,
+                context,
                 logger
             );
             aggregationServer.run();

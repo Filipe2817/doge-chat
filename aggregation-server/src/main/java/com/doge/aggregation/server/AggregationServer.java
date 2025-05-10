@@ -1,7 +1,16 @@
 package com.doge.aggregation.server;
 
 import com.doge.aggregation.server.socket.zmq.PullEndpoint;
+
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.zeromq.ZContext;
+
 import com.doge.aggregation.server.handler.ShuffleMessageHandler;
+import com.doge.aggregation.server.neighbours.Neighbour;
 import com.doge.aggregation.server.neighbours.NeighbourManager;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
@@ -11,31 +20,33 @@ public class AggregationServer {
     private volatile boolean running;
     private final int id;
     private final int l; // how many peer‑entries you send in the request
-    private final int i; // how many peer‑entries you take in from the reply
 
     private PullEndpoint pullEndpoint;
 
     private NeighbourManager neighbourManager;
 
+    private final ZContext context;
     private final Logger logger;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public AggregationServer(
         int id,
         int l,
-        int i,
-        PullEndpoint pullEndpoint,
         NeighbourManager neighbourManager,
+        PullEndpoint pullEndpoint,
+        ZContext context,
         Logger logger
     ) {
         this.running = false;
         this.id = id;
-
         this.l = l;
-        this.i = i;
 
         this.pullEndpoint = pullEndpoint;
+
         this.neighbourManager = neighbourManager;
 
+        this.context = context;
         this.logger = logger;
     }
 
@@ -45,6 +56,7 @@ public class AggregationServer {
 
     public void run() {
         this.running = true;
+
 
         Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
 
@@ -58,19 +70,31 @@ public class AggregationServer {
     }
 
     private void runPull() {
-        this.pullEndpoint.on(MessageTypeCase.SHUFFLEMESSAGE, new ShuffleMessageHandler(
+        ShuffleMessageHandler shuffleMessageHandler = new ShuffleMessageHandler(
             this,
-            this.pullEndpoint,
             this.neighbourManager,
             this.l,
+            this.pullEndpoint,
+            this.context,
             logger
-        ));
+        );
+
+        this.pullEndpoint.on(MessageTypeCase.SHUFFLEMESSAGE, shuffleMessageHandler);
+
+        // Schedule periodic shuffle trigger every 30 seconds (for example)
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                logger.debug("Triggering shuffle...");
+                shuffleMessageHandler.triggerShuffle();
+            } catch(Exception e) {
+                logger.error("Error triggering shuffle: " + e.getMessage());
+            }
+        }, 10, 10, TimeUnit.SECONDS); // initial delay 10s, then every 30s
+
 
         while (this.running) {
             try {
                 this.pullEndpoint.receiveOnce();
-                // TODO: trigger periodic shuffle here
-
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;

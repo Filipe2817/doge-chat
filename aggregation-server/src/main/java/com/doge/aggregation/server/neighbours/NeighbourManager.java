@@ -6,31 +6,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
-import org.zeromq.ZContext;
-
 import com.doge.aggregation.server.Logger;
-import com.doge.aggregation.server.neighbours.Neighbour;
-import com.doge.aggregation.server.socket.zmq.PullEndpoint;
-import com.doge.aggregation.server.socket.zmq.PushEndpoint;
 
 public class NeighbourManager {
     private final int cacheSize;
     private final Map<Integer, Neighbour> cache;
     private final Random random = ThreadLocalRandom.current();
 
-    private final PullEndpoint pullEndpoint;
-    private final Logger logger;
-    private final ZContext context;
-
-    public NeighbourManager(int cacheSize, Logger logger, PullEndpoint pullEndpoint, ZContext context) {
+    public NeighbourManager(int cacheSize) {
         this.cacheSize = cacheSize;
         this.cache = new HashMap<>(cacheSize);
-        this.pullEndpoint = pullEndpoint;
-        this.logger = logger;
-        this.context = context;
     }
 
     public void ageAll() {
@@ -43,35 +30,39 @@ public class NeighbourManager {
         return cache.get(id);
     }
 
-    public void addNeighbour(Integer id, int age) {
-        try {
-            PushEndpoint pushEndpoint = new PushEndpoint(context);
-            pushEndpoint.connectSocket("localhost", id);
-            Neighbour n = new Neighbour(id, this.pullEndpoint, pushEndpoint, age, logger);
-            cache.put(id, n);
+    public Neighbour getOldest() {
+        List<Neighbour> neighbours = new ArrayList<>(cache.values());
+        Collections.sort(neighbours);
+        return neighbours.get(0);
+    }
 
-            if (cache.size() > cacheSize) {
-                List<Neighbour> neighbours = new ArrayList<>(cache.values());
-                Collections.sort(neighbours);
-                Neighbour toRemove = neighbours.get(0);
-                cache.remove(toRemove.getId());
+    public void addNeighbour(Neighbour n) {
+        if (cache.size() >= cacheSize) {
+            Neighbour oldest = getOldest();
+            if (oldest != null) {
+                cache.remove(oldest.getId());
             }
-        } catch (Exception e) {
-            logger.error("Failed to add neighbour: " + e.getMessage());
         }
+        cache.put(n.getId(), n);
     }
 
-    public void addNeighbour(Integer id) {
-        addNeighbour(id, 0);
+    public Neighbour remove(Integer id) {
+        return cache.remove(id);
     }
 
-    public void remove(Integer id) {
-        cache.remove(id);
-    }
-
-    public List<Neighbour> pickRandom(int k) {
-        List<Neighbour> candidates = new ArrayList<>(cache.values());
+    public List<Neighbour> pickRandom(int k, Neighbour exclude) {
+        List<Neighbour> candidates = new ArrayList<>();
+        for (Neighbour n : cache.values()) {
+            if (!n.equals(exclude)) {
+                candidates.add(n);
+            }
+        }
         Collections.shuffle(candidates, this.random);
-        return candidates.subList(0, Math.min(k, candidates.size()));
+        int num = Math.min(k, candidates.size());
+        return new ArrayList<>(candidates.subList(0, num));
+    }
+
+    public int size() {
+        return cache.size();
     }
 }
