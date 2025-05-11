@@ -51,20 +51,60 @@ loop(Socket) ->
 %% Business logic – record based
 %%--------------------------------------------------------------------
 
-handle_command(Socket, #get{key = Key}) ->
+handle_command(Socket, #get{key = Key, ref = undefined}) -> % no reference -> handle or redirect
+    Result = state_manager:get(Key),
+    case Result of
+        {redirect, Pid, Ref} ->
+            Msg = proto:get(Key, Ref),
+            send_msg(Pid, Msg);
+        _ ->
+            ReplyRec = case Result of
+                not_found       -> proto:get_resp(not_found, Key, undefined);
+                {error, _Rsn}   -> proto:get_resp(error,     Key, undefined);
+                Value           -> proto:get_resp(ok,        Key, Value)
+            end,
+            gen_tcp:send(Socket, codec:encode(ReplyRec))
+    end;
+
+handle_command(Socket, #get{key = Key, ref = Ref}) -> % reference -> handle
     ReplyRec =
         case state_manager:get(Key) of
-            not_found       -> proto:get_resp(not_found, Key, undefined);
-            {error, _Rsn}   -> proto:get_resp(error,     Key, undefined);
-            Value           -> proto:get_resp(ok,        Key, Value)
+            not_found       -> proto:get_resp(not_found, Key, undefined, Ref);
+            {error, _Rsn}   -> proto:get_resp(error,     Key, undefined, Ref);
+            Value           -> proto:get_resp(ok,        Key, Value, Ref)
         end,
     gen_tcp:send(Socket, codec:encode(ReplyRec));
 
-handle_command(Socket, #set{is_peer = _IsPeer, key = Key, value = Val}) ->
-    ok      = state_manager:put(Key, Val),
-    Reply   = proto:set_resp(ok, Key, Val),
+handle_command(_Socket, #get_response{status = Status, key = Key, value = Val, ref = Ref}) -> % send to client
+    Pid = state_manager:get_pending_pid(Ref),
+    Msg = proto:get_resp(Status, Key, Val),
+    send_msg(Pid, Msg);
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+handle_command(Socket, #set{key = Key, value = Val, ref = undefined}) -> % no reference -> handle or redirect
+    case state_manager:put(Key, Val) of
+        {redirect, Pid, Ref} ->
+            Msg = proto:set(Key, Val, Ref),
+            send_msg(Pid, Msg);
+        ok ->
+            Reply = proto:set_resp(ok, Key, Val),
+            state_manager:debug(),
+            gen_tcp:send(Socket, codec:encode(Reply))
+    end;
+
+handle_command(Socket, #set{key = Key, value = Val, ref = Ref}) -> % reference -> handle
+    ok = state_manager:put(Key, Val),
+    Reply = proto:set_resp(ok, Key, Val, Ref),
     state_manager:debug(),
     gen_tcp:send(Socket, codec:encode(Reply));
+
+handle_command(_Socket, #set_response{status = Status, key = Key, value = Val, ref = Ref}) -> % send to client
+    Pid = state_manager:get_pending_pid(Ref),
+    Msg = proto:set_resp(Status, Key, Val),
+    send_msg(Pid, Msg);
+
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 handle_command(Socket, #join_init{node_id = NodeId, address = NodeAddr, port = NodePort}) ->
     io:format("Join init from node ~p~n", [NodeId]),

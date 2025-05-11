@@ -17,12 +17,11 @@ sha1(Data) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_responsible_node(Key, State) -> % can be cleaner with lists:dropwhile
-    #{bucket_hashes := NodeHashes} = State,
+get_responsible_node(Key, Ring) ->
     KeyHash = sha1(Key),
-    get_responsible_node_aux(KeyHash, NodeHashes, hd(NodeHashes)).
+    get_responsible_node_aux(KeyHash, Ring, hd(Ring)).
 
-get_responsible_node_aux(_KeyHash, [], {{_, FirstNode}}) ->
+get_responsible_node_aux(_KeyHash, [], {_, FirstNode}) ->
     FirstNode;
 
 get_responsible_node_aux(KeyHash, [{NodeHash, NodeId} | Rest], First) ->

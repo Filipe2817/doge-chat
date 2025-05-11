@@ -21,26 +21,28 @@
 
 %% ---- packet structs (records) -------------------------------------
 -record(get, {
-    is_peer :: boolean(),
-    key :: binary()
+    key :: binary(),
+    ref = undefined
 }).
 
 -record(get_response, {
     status :: ok | error | not_found,
     key    :: binary(),
-    value  :: binary() | undefined   %% undefined if not_found / error
+    value  :: binary() | undefined, %% undefined if not_found / error
+    ref    = undefined
 }).
 
 -record(set, {
-    is_peer :: boolean(),
     key     :: binary(),
-    value   :: binary()
+    value   :: binary(),
+    ref     = undefined
 }).
 
 -record(set_response, {
     status :: ok | error,
     key    :: binary(),
-    value  :: binary()
+    value  :: binary(),
+    ref    = undefined
 }).
 
 -record(join_init, {

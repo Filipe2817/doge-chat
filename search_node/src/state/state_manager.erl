@@ -7,6 +7,7 @@
     % Store Interaction
     get/1,
     put/2,
+    get_pending_pid/1,
     % Endpoints
     add_endpoint/3,
     get_endpoint_connection/1,
@@ -39,6 +40,9 @@ get(Key) ->
 
 put(Key, Value) ->
 	gen_server:call(?MODULE, {put, Key, Value}).
+
+get_pending_pid(Ref) ->
+    gen_server:call(?MODULE, {get_pending_pid, Ref}).
 
 %% Endpoints
 
@@ -90,47 +94,68 @@ init([NodeId, Addr, Port, KnownNodes]) ->
         topics      => #{},                                 % string => [ {Ip, Port} ]
         my_hashes   => MyHashes,                            % [ {NodeHash, NodeId} ]
         ring        => MyHashes,                            % [ {NodeHash, NodeId} ]
-        endpoints   => extract_known_nodes(#{}, KnownNodes) % NodeId => {Ip, Port, Pid}
+        endpoints   => extract_known_nodes(#{}, KnownNodes),% NodeId => {Ip, Port, Pid}
+        pending_req => #{}
     },
     {ok, State}.
 
-
 %%%%%%%%%%%%%%% Store Interaction
 
-handle_call({get, Key}, _From, State) ->
-    TopicsMap = maps:get(topics, State),
-    Value = maps:get(Key, TopicsMap, not_found),
-    {reply, Value, State};
+handle_call({get, Key}, {CallerPid, _Tag}, State) ->
+    ResponsibleNode = dht:get_responsible_node(Key, maps:get(ring, State)),
+    MyId = maps:get(node_id, State),
+    if 
+        ResponsibleNode =:= MyId ->
+            TopicsMap = maps:get(topics, State),
+            Value = maps:get(Key, TopicsMap, not_found),
+            {reply, Value, State};
+        true -> % redirect
+            % Save request
+            Ref = erlang:make_ref(),
+            Pending = maps:get(pending_req, State),
+            NewPending = maps:put(Ref, CallerPid, Pending),
+            NewState = maps:put(pending_req, NewPending, State),
+            % Redirect
+            Endpoints = maps:get(endpoints, State),
+            {_Addr, _Port, Pid} = maps:get(ResponsibleNode, Endpoints, undefined),
+            {reply, {redirect, Pid, Ref}, NewState}
+    end;
 
-% Node = get_responsible_node(Key, State),
-% MyId = maps:get(node_id, State),
-% if Node =:= MyId ->
-%    execute_read
-%    reply (client / server)
-% true ->
-%    redirect
+handle_call({put, Key, Value}, {CallerPid, _Tag}, State) ->
+    ResponsibleNode = dht:get_responsible_node(Key, maps:get(ring, State)),
+    MyId = maps:get(node_id, State),
+    if 
+        ResponsibleNode =:= MyId ->
+            TopicsMap = maps:get(topics, State),
+            CurrentValue = maps:get(Key, TopicsMap, []),
+            NewValue = [Value | CurrentValue],
+            NewTopicsMap = maps:put(Key, NewValue, TopicsMap),
+            NewState = maps:put(topics, NewTopicsMap, State),
+            {reply, ok, NewState};
+        true -> % redirect
+            % Save request
+            Ref = erlang:make_ref(),
+            Pending = maps:get(pending_req, State),
+            NewPending = maps:put(Ref, CallerPid, Pending),
+            NewState = maps:put(pending_req, NewPending, State),
+            % Redirect
+            Endpoints = maps:get(endpoints, State),
+            {_Addr, _Port, Pid} = maps:get(ResponsibleNode, Endpoints, undefined),
+            {reply, {redirect, Pid, Ref}, NewState}
+    end;
 
-handle_call({put, Key, Value}, _From, State) ->
-    TopicsMap = maps:get(topics, State),
-    CurrentValue = maps:get(Key, TopicsMap, []),
-    NewValue = [Value | CurrentValue],
-    NewTopicsMap = maps:put(Key, NewValue, TopicsMap),
-    NewState = maps:put(topics, NewTopicsMap, State),
-    {reply, ok, NewState};
-
-% Node = get_responsible_node(Key, State),
-% MyId = maps:get(node_id, State),
-% if Node =:= MyId ->
-%    execute_write
-%    reply (client / server)
-% true ->
-%    redirect
+handle_call({get_pending_pid, Ref}, _From, State) ->
+    Pending = maps:get(pending_req, State),
+    Pid = maps:get(Ref, Pending),
+    NewPending = maps:remove(Ref, Pending),
+    NewState = maps:put(pending_req, NewPending, State),
+    {reply, Pid, NewState};
 
 %%%%%%%%%%%%%%% Endpoints
 
-handle_call({add_endpoint, NodeId, Addr, Port}, From, State) ->
+handle_call({add_endpoint, NodeId, Addr, Port}, {CallerPid, _Tag}, State) ->
     Endpoints = maps:get(endpoints, State),
-    NewEndpoints = maps:put(NodeId, {Addr, Port, From}, Endpoints),
+    NewEndpoints = maps:put(NodeId, {Addr, Port, CallerPid}, Endpoints),
     NewState = maps:put(endpoints, NewEndpoints, State),
     {reply, ok, NewState};
 
