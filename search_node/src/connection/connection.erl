@@ -63,6 +63,7 @@ handle_command(Socket, #get{key = Key}) ->
 handle_command(Socket, #set{is_peer = _IsPeer, key = Key, value = Val}) ->
     ok      = state_manager:put(Key, Val),
     Reply   = proto:set_resp(ok, Key, Val),
+    state_manager:debug(),
     gen_tcp:send(Socket, codec:encode(Reply));
 
 handle_command(Socket, #join_init{node_id = NodeId, address = NodeAddr, port = NodePort}) ->

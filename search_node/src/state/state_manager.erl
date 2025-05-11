@@ -118,7 +118,6 @@ handle_call({put, Key, Value}, _From, State) ->
     NewState = maps:put(topics, NewTopicsMap, State),
     {reply, ok, NewState};
 
-
 % Node = get_responsible_node(Key, State),
 % MyId = maps:get(node_id, State),
 % if Node =:= MyId ->
