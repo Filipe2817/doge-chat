@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.doge.chat.server.Logger;
-import com.doge.chat.server.logs.LogsManager;
+import com.doge.chat.server.log.LogManager;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.ForwardChatMessage;
@@ -14,18 +14,18 @@ import com.doge.common.proto.MessageWrapper;
 public class CausalDeliveryManager {
     private List<ForwardChatMessage> messagesBuffer;
 
+    private LogManager logManager;
     private final VectorClockManager vectorClockManager;
     private final PubEndpoint clientPubEndpoint;
     private Logger logger;
-    private LogsManager logsManager;
 
-    public CausalDeliveryManager(VectorClockManager vectorClockManager, PubEndpoint clientPubEndpoint, Logger logger,LogsManager logsManager) {
+    public CausalDeliveryManager(VectorClockManager vectorClockManager, LogManager logManager, PubEndpoint clientPubEndpoint, Logger logger) {
         this.messagesBuffer = new ArrayList<>();
 
+        this.logManager = logManager;
         this.vectorClockManager = vectorClockManager;
         this.clientPubEndpoint = clientPubEndpoint;
         this.logger = logger;
-        this.logsManager = logsManager;
     }
 
     public void addAndMaybeDeliver(ForwardChatMessage message) {
@@ -53,9 +53,7 @@ public class CausalDeliveryManager {
             if (canDeliver(selfVectorClock, messageVectorClock, senderId)) {
                 logger.info("Delivering message from client '" + clientId + "' to topic '" + topic + "'");
 
-                //Add message to logs
-                logsManager.addLog(forwardChatMessage);
-                //logger.debug("Logs state: " + logsManager.getLogs());
+                logManager.addLog(forwardChatMessage);
 
                 MessageWrapper wrapper = createChatMessageFromForwardChatMessage(forwardChatMessage);
                 this.clientPubEndpoint.send(topic, wrapper);

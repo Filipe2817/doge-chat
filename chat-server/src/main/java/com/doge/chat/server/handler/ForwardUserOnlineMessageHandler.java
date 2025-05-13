@@ -31,9 +31,9 @@ public class ForwardUserOnlineMessageHandler implements MessageHandler<MessageWr
         String topic = message.getTopic();
 
         DotStore incomingDotStore = new DotStore();
-        message.getDotStoreMap().forEach((key, dotStoreMessage) -> {
+        message.getDotStoreMap().forEach((key, dotSetMessage) -> {
             DotSet dotSet = new DotSet();
-            for (ForwardUserOnlineMessage.DotMessage d : dotStoreMessage.getDotList()) {
+            for (ForwardUserOnlineMessage.DotMessage d : dotSetMessage.getDotList()) {
                 dotSet.addDot(Pair.of(d.getServerId(), d.getClock()));
             }
             incomingDotStore.put(key, dotSet);

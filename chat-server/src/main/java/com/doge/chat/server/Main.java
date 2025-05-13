@@ -4,10 +4,12 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
-import com.doge.chat.server.logs.LogsManager;
 import org.zeromq.ZContext;
 
 import com.doge.chat.server.causal.VectorClockManager;
+import com.doge.chat.server.log.LogManager;
+import com.doge.chat.server.socket.reactive.ReactiveGrpcEndpoint;
+import com.doge.chat.server.socket.reactive.ReactiveLogService;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
@@ -35,7 +37,7 @@ public class Main implements Callable<Integer> {
     )
     private int port = 5555;
 
-    @Option(names = {"-sc", "--subscriber-ports"}, split = ",", required = true, description = "Comma-separated list of ports for chat servers to connect to")
+    @Option(names = {"-sub", "--subscriber-ports"}, split = ",", required = true, description = "Comma-separated list of ports for chat servers to connect to")
     private List<Integer> chatServerPorts;
 
     public static void main(String[] args) {
@@ -53,28 +55,34 @@ public class Main implements Callable<Integer> {
             int pullPort = this.port;
             PullEndpoint pullEndpoint = new PullEndpoint(context);
             pullEndpoint.bindSocket("localhost", pullPort);
-            logger.debug("PULL socket bound to port " + pullPort);
+            logger.debug("[PULL] Bound to port " + pullPort);
             
             SubEndpoint subEndpoint = new SubEndpoint(context);
             for (Integer port : this.chatServerPorts) {
                 subEndpoint.connectSocket("localhost", port);
-                logger.debug("SUB socket connected to port " + port);
+                logger.debug("[SUB] Connected to port " + port);
             }
             
             int repPort = this.port + 1;
             RepEndpoint repEndpoint = new RepEndpoint(context);
             repEndpoint.bindSocket("localhost", repPort);
-            logger.debug("REP socket bound to port " + repPort);
+            logger.debug("[REP] Bound to port " + repPort);
 
             int clientPubPort = this.port + 2;
             PubEndpoint clientPubEndpoint = new PubEndpoint(context);
             clientPubEndpoint.bindSocket("localhost", clientPubPort);
-            logger.debug("Client PUB socket bound to port " + clientPubPort);
+            logger.debug("[PUB | Client] bound to port " + clientPubPort);
 
             int chatServerPubPort = this.port + 3;
             PubEndpoint chatServerPubEndpoint = new PubEndpoint(context);
             chatServerPubEndpoint.bindSocket("localhost", chatServerPubPort);
-            logger.debug("ChatServer PUB socket bound to port " + chatServerPubPort);
+            logger.debug("[PUB | Chat Server] Bound to port " + chatServerPubPort);
+            
+            int reactivePort = this.port + 4;
+            LogManager logManager = new LogManager();
+            ReactiveLogService logService = new ReactiveLogService(logger, logManager);
+            ReactiveGrpcEndpoint reactiveEndpoint = new ReactiveGrpcEndpoint(reactivePort, logService);
+            logger.debug("[REACTIVE] Initialized on port " + reactivePort);
 
             VectorClockManager vectorClockManager = new VectorClockManager(this.port);
             UserManager userManager = new UserManager(this.port);
@@ -90,8 +98,6 @@ public class Main implements Callable<Integer> {
             userManager.addTopic(topic, chatServerPorts);
             logger.debug("User manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
 
-            LogsManager logsManager = new LogsManager();
-
             ChatServer chatServer = new ChatServer(
                 this.port,
                 this.topic,
@@ -100,10 +106,11 @@ public class Main implements Callable<Integer> {
                 repEndpoint,
                 clientPubEndpoint,
                 chatServerPubEndpoint,
+                reactiveEndpoint,
+                logManager,
                 vectorClockManager,
                 userManager,
-                logger,
-                logsManager
+                logger
             );
             chatServer.run();
 

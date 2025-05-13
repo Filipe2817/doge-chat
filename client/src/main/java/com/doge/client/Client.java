@@ -1,14 +1,15 @@
 package com.doge.client;
 
 import java.io.IOException;
-import java.util.UUID;
 
 import com.doge.client.command.CommandManager;
 import com.doge.client.command.ExitCommand;
 import com.doge.client.command.HelpCommand;
+import com.doge.client.command.LogsCommand;
 import com.doge.client.command.OnlineUsersCommand;
 import com.doge.client.command.SendMessageCommand;
 import com.doge.client.handler.ChatMessageHandler;
+import com.doge.client.socket.reactive.ReactiveGrpcClient;
 import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.client.socket.zmq.ReqEndpoint;
 import com.doge.client.socket.zmq.SubEndpoint;
@@ -27,18 +28,27 @@ public class Client {
     private PushEndpoint pushEndpoint;
     private ReqEndpoint reqEndpoint;
     private SubEndpoint subEndpoint;
+    private ReactiveGrpcClient reactiveClient;
 
     private Console console;
     private CommandManager commandManager;
 
-    public Client(PushEndpoint pushEndpoint, ReqEndpoint reqEndpoint, SubEndpoint subEndpoint, Console console) throws IOException {
-        this.id = UUID.randomUUID().toString();
+    public Client(
+        String name,
+        PushEndpoint pushEndpoint, 
+        ReqEndpoint reqEndpoint, 
+        SubEndpoint subEndpoint,
+        ReactiveGrpcClient reactiveClient,
+        Console console
+    ) throws IOException {
+        this.id = name;
         this.currentTopic = "default";
         this.running = false;
 
         this.pushEndpoint = pushEndpoint;
         this.reqEndpoint = reqEndpoint;
         this.subEndpoint = subEndpoint;
+        this.reactiveClient = reactiveClient;
 
         this.console = console;
         console.alterSystemPrint();
@@ -84,12 +94,12 @@ public class Client {
 
     private void runCli() {
         this.commandManager.registerCommand(new SendMessageCommand(this, this.pushEndpoint));
+        this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
+        this.commandManager.registerCommand(new OnlineUsersCommand(this, this.reqEndpoint));
+        this.commandManager.registerCommand(new LogsCommand(this, this.reactiveClient));
         
         HelpCommand helpCommand = new HelpCommand(this.commandManager);
         this.commandManager.registerCommand(helpCommand);
-        
-        this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
-        this.commandManager.registerCommand(new OnlineUsersCommand(this, this.reqEndpoint));
 
         // Display help on startup
         helpCommand.execute(this.console, null);
@@ -103,6 +113,7 @@ public class Client {
 
                 this.commandManager.handleCommand(this.console, line);
             } catch (Exception e) {
+                console.debug("Error while reading line or handling command: " + e.getMessage());
                 this.stop();
             }
         }

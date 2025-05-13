@@ -2,7 +2,6 @@ package com.doge.chat.server.handler;
 
 import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.CausalDeliveryManager;
-import com.doge.chat.server.logs.LogsManager;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.ForwardChatMessage;
 import com.doge.common.proto.MessageWrapper;

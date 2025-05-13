@@ -2,8 +2,14 @@ package com.doge.chat.server;
 
 import com.doge.chat.server.causal.CausalDeliveryManager;
 import com.doge.chat.server.causal.VectorClockManager;
-import com.doge.chat.server.handler.*;
-import com.doge.chat.server.logs.LogsManager;
+import com.doge.chat.server.handler.AnnounceMessageHandler;
+import com.doge.chat.server.handler.ChatMessageHandler;
+import com.doge.chat.server.handler.ExitMessageHandler;
+import com.doge.chat.server.handler.ForwardChatMessageHandler;
+import com.doge.chat.server.handler.ForwardUserOnlineMessageHandler;
+import com.doge.chat.server.handler.GetOnlineUsersMessageHandler;
+import com.doge.chat.server.log.LogManager;
+import com.doge.chat.server.socket.reactive.ReactiveGrpcEndpoint;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
@@ -23,11 +29,12 @@ public class ChatServer {
     private RepEndpoint repEndpoint;
     private PubEndpoint clientPubEndpoint;
     private PubEndpoint chatServerPubEndpoint;
+    private ReactiveGrpcEndpoint reactiveEndpoint;
 
     private VectorClockManager vectorClockManager;
+    private LogManager logManager;
     private CausalDeliveryManager causalDeliveryManager;
     private UserManager userManager;
-    private LogsManager logsManager;
 
     private final Logger logger;
 
@@ -39,10 +46,11 @@ public class ChatServer {
         RepEndpoint repEndpoint,
         PubEndpoint clientPubEndpoint,
         PubEndpoint chatServerPubEndpoint,
+        ReactiveGrpcEndpoint reactiveEndpoint,
+        LogManager logManager,
         VectorClockManager vectorClockManager,
         UserManager userManager,
-        Logger logger,
-        LogsManager logsManager
+        Logger logger
     ) {
         this.running = false;
         this.id = id;
@@ -53,18 +61,19 @@ public class ChatServer {
         this.subEndpoint = subEndpoint;
         this.clientPubEndpoint = clientPubEndpoint;
         this.chatServerPubEndpoint = chatServerPubEndpoint;
-        
-        this.logger = logger;
-        this.logsManager = logsManager;
+        this.reactiveEndpoint = reactiveEndpoint;
 
+        this.logManager = logManager;
         this.vectorClockManager = vectorClockManager;
         this.causalDeliveryManager = new CausalDeliveryManager(
             this.vectorClockManager,
+            this.logManager,
             this.clientPubEndpoint,
-            this.logger,
-            this.logsManager
+            logger
         );
         this.userManager = userManager;
+        
+        this.logger = logger;
     }
 
     public int getId() {
@@ -77,21 +86,25 @@ public class ChatServer {
         Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
         Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
         Thread subscriberThread = new Thread(() -> this.runSub(), "Sub-Thread");
+        Thread reactiveThread = new Thread(() -> this.runReactive(), "Reactive-Thread");
 
         try {
             pullThread.start();
             repThread.start();
             subscriberThread.start();
+            reactiveThread.start();
 
             pullThread.join();
             repThread.join();
             subscriberThread.join();
+            reactiveThread.join();
         } catch (InterruptedException e) {
             pullThread.interrupt();
             repThread.interrupt();
             subscriberThread.interrupt();
+            reactiveThread.interrupt();
         } finally {
-           this.stop();
+            this.stop();
         }
     }
 
@@ -102,10 +115,14 @@ public class ChatServer {
             this.clientPubEndpoint,
             this.chatServerPubEndpoint,
             this.vectorClockManager,
-            this.logsManager
+            this.logManager
         ));
 
-        this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(this.logger, this.chatServerPubEndpoint, this.userManager));
+        this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(
+            this.logger, 
+            this.chatServerPubEndpoint, 
+            this.userManager
+        ));
 
         while (this.running) {
             try {
@@ -121,11 +138,16 @@ public class ChatServer {
     }
 
     private void runRep() {
-        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(this.logger, this.repEndpoint, this.userManager));
-        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
+        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(
             this.logger, 
-            this.chatServerPubEndpoint, 
             this.repEndpoint, 
+            this.userManager
+        ));
+        
+        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
+            this.logger,
+            this.chatServerPubEndpoint,
+            this.repEndpoint,
             this.userManager
         ));
 
@@ -162,6 +184,18 @@ public class ChatServer {
         }
     }
 
+    private void runReactive() {
+        while (this.running) {
+            try {
+                logger.info("[REACTIVE] Started");
+                reactiveEndpoint.runServer();
+            } catch (Exception e) {
+                logger.error("[REACTIVE] Error while running: " + e.getMessage());
+                break;
+            }
+        }
+    }
+
     private void stop() {
         this.running = false;
 
@@ -169,7 +203,7 @@ public class ChatServer {
         this.subEndpoint.close();
         this.clientPubEndpoint.close();
         this.chatServerPubEndpoint.close();
-        
+
         logger.info("Chat server stopped");
     }
 }

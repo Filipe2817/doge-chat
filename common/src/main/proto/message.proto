@@ -30,6 +30,24 @@ message GetOnlineUsersResponseMessage {
     repeated string onlineUsers = 1;
 }
 
+// Logs
+
+message LogRequestMessage {
+    string topic = 1;
+    int32 last = 2;
+}
+
+message UserLogRequestMessage {
+    string topic = 1;
+    int32 last = 2;
+    string userId = 3;
+}
+
+service LogService {
+    rpc GetLogs (LogRequestMessage) returns (stream ChatMessage);
+    rpc GetUserLogs (UserLogRequestMessage) returns (stream ChatMessage);
+}
+
 // Control
 
 message AnnounceMessage {
@@ -51,15 +69,13 @@ message ExitMessage {
     string topic = 2;
 }
 
-
 message ForwardUserOnlineMessage {
     message DotMessage {
         int32 serverId = 1;
         int32 clock = 2;
     }
 
-    // DotSet
-    message DotStoreMessage {
+    message DotSetMessage {
         repeated DotMessage dot = 1;
     }
 
@@ -76,7 +92,7 @@ message ForwardUserOnlineMessage {
     map<int32, int32> vectorClock = 4;
 
     // Map from @UserIdType to DotSet
-    map<string, DotStoreMessage> dotStore = 5;
+    map<string, DotSetMessage> dotStore = 5;
 }
 
 // Wrapper
@@ -86,12 +102,15 @@ message MessageWrapper {
         ChatMessage chatMessage = 1;
         ForwardChatMessage forwardChatMessage = 2;
 
-        GetOnlineUsersMessage getOnlineUsersMessage = 3;
-        GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = 4;
+        LogRequestMessage logRequestMessage = 3;
+        UserLogRequestMessage userLogRequestMessage = 4;
 
-        AnnounceMessage announceMessage = 5;
-        AnnounceResponseMessage announceResponseMessage = 6;
-        ExitMessage exitMessage = 7;
-        ForwardUserOnlineMessage forwardUserOnlineMessage = 8;
+        GetOnlineUsersMessage getOnlineUsersMessage = 5;
+        GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = 6;
+
+        AnnounceMessage announceMessage = 7;
+        AnnounceResponseMessage announceResponseMessage = 8;
+        ExitMessage exitMessage = 9;
+        ForwardUserOnlineMessage forwardUserOnlineMessage = 10;
     }
 }

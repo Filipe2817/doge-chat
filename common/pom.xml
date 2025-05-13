@@ -28,13 +28,42 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>${protobuf.version}</version>
+            <version>${protoc.version}</version>
+        </dependency> 
+
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+            <version>${grpc.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.salesforce.servicelibs</groupId>
+            <artifactId>rx3grpc-stub</artifactId>
+            <version>${reactive.grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.reactivex.rxjava3</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>${rxjava.version}</version>
+        </dependency>
+        
         <dependency>
             <groupId>org.zeromq</groupId>
             <artifactId>jeromq</artifactId>
             <version>${jeromq.version}</version>
         </dependency>
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -46,26 +75,40 @@
             <extension>
                 <groupId>kr.motd.maven</groupId>
                 <artifactId>os-maven-plugin</artifactId>
-                <version>1.7.0</version>
+                <version>1.4.1.Final</version>
             </extension>
         </extensions>
+
         <plugins>
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>0.6.1</version>
+                <configuration>
+                    <protocArtifact>com.google.protobuf:protoc:${protoc.version}:exe:${os.detected.classifier}</protocArtifact>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+                </configuration>
+
                 <executions>
                     <execution>
-                        <id>compile-protobuf</id>
                         <goals>
                             <goal>compile</goal>
+                            <goal>compile-custom</goal>
                         </goals>
+                        <configuration>
+                            <protocPlugins>
+                                <protocPlugin>
+                                    <id>rxgrpc</id>
+                                    <groupId>com.salesforce.servicelibs</groupId>
+                                    <artifactId>rx3grpc</artifactId>
+                                    <version>${reactive.grpc.version}</version>
+                                    <mainClass>com.salesforce.rx3grpc.Rx3GrpcGenerator</mainClass>
+                                </protocPlugin>
+                            </protocPlugins>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-                    <protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
-                </configuration>
             </plugin>
         </plugins>
     </build>

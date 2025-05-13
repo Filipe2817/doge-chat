@@ -4,6 +4,7 @@ import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
 
+import com.doge.client.socket.reactive.ReactiveGrpcClient;
 import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.client.socket.zmq.ReqEndpoint;
 import com.doge.client.socket.zmq.SubEndpoint;
@@ -14,7 +15,10 @@ import picocli.CommandLine.Option;
 
 @Command(name = "client", mixinStandardHelpOptions = true)
 public class Main implements Callable<Integer> {
-    @Option(names = {"-sc", "--server-chat"}, required = true, 
+    @Option(names = {"-n", "--name"}, required = true, description = "Name of the client to be used as an identifier.")
+    private String name;
+
+    @Option(names = {"-cs", "--chat-server"}, required = true, 
         description = """
         Port for chat server to connect to.
         PUSH will use this port.
@@ -37,21 +41,27 @@ public class Main implements Callable<Integer> {
             Console console = new Console();
             context = new ZContext();
 
+            int pullPort = this.chatServerPort;
             PushEndpoint pushEndpoint = new PushEndpoint(context);
-            pushEndpoint.connectSocket("localhost", this.chatServerPort);
-            console.debug("Connected to PULL socket on port " + this.chatServerPort);
+            pushEndpoint.connectSocket("localhost", pullPort);
+            console.debug("[PULL] Connected on port " + pullPort);
             
+            int repPort = this.chatServerPort + 1;
             ReqEndpoint reqEndpoint = new ReqEndpoint(context);
-            reqEndpoint.connectSocket("localhost", (this.chatServerPort + 1));
-            console.debug("Connected to REP socket on port " + (this.chatServerPort + 1));
+            reqEndpoint.connectSocket("localhost", repPort);
+            console.debug("[REQ] Connected on port " + repPort);
 
+            int pubPort = this.chatServerPort + 2;
             SubEndpoint subEndpoint = new SubEndpoint(context);
-            subEndpoint.connectSocket("localhost", (this.chatServerPort + 2));
-            console.debug("Connected to PUB socket on port " + (this.chatServerPort + 2));
+            subEndpoint.connectSocket("localhost", pubPort);
+            console.debug("[SUB] Connected on port " + pubPort);
 
-            Client client;
-            client = new Client(pushEndpoint, reqEndpoint, subEndpoint, console);
+            int reactivePort = this.chatServerPort + 4;
+            ReactiveGrpcClient reactiveClient = new ReactiveGrpcClient(console);
+            reactiveClient.setup("localhost", reactivePort);
+            console.debug("[REACTIVE] Connected on port " + reactivePort);
 
+            Client client = new Client(name, pushEndpoint, reqEndpoint, subEndpoint, reactiveClient, console);
             client.run();
 
             return 0;

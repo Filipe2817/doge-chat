@@ -6,7 +6,7 @@ import com.doge.chat.server.ChatServer;
 import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.VectorClock;
 import com.doge.chat.server.causal.VectorClockManager;
-import com.doge.chat.server.logs.LogsManager;
+import com.doge.chat.server.log.LogManager;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.common.proto.ChatMessage;
 import com.doge.common.proto.ForwardChatMessage;
@@ -20,7 +20,7 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
     private final PubEndpoint clientPubEndpoint;
     private final PubEndpoint chatServerPubEndpoint;
     private final VectorClockManager vectorClockManager;
-    private final LogsManager logsManager;
+    private final LogManager logsManager;
 
     public ChatMessageHandler(
             ChatServer chatServer,
@@ -28,7 +28,7 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
             PubEndpoint clientPubEndpoint,
             PubEndpoint chatServerPubEndpoint,
             VectorClockManager vectorClockManager,
-            LogsManager logsManager
+            LogManager logsManager
             ) {
         this.chatServer = chatServer;
         this.logger = logger;
@@ -57,7 +57,6 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         this.chatServerPubEndpoint.send(topic, forward);
 
         logsManager.addLog(forward.getForwardChatMessage());
-        //logger.debug("Current log: " + logsManager.getLogs());
 
         logger.info("Forwarded message to topic '" + topic + "' with content: " + content);
     }

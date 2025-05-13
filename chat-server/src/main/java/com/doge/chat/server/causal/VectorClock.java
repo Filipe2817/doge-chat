@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 public class VectorClock {
-    // TODO: Should this be a ConcurrentHashMap?
     private Map<Integer, Integer> data;
 
     public VectorClock(List<Integer> servers) {
@@ -43,32 +42,35 @@ public class VectorClock {
         this.data.put(server, current + 1);
     }
 
-    //Compares this vector clock to another vector clock
-    //Returns -1 if this vector clock is before the other, 1 if this vector clock is after the other, and 0 if they are concurrent
-    public int compare(VectorClock other){
-        //Will be true in the end of the comparison if the clock values are always less or equal to the other
+    // Compare this vector clock to another vector clock
+    //
+    // Returns -1 if this vector clock is BEFORE the other
+    // Returns 1 if this vector clock is AFTER the other
+    // Returns 0 if they are CONCURRENT or are the same
+    public int compare(VectorClock other) {
         boolean beforeAll = true;
-        //Will be true in the end of the comparison if the clock values are always greater or equal to the other
         boolean afterAll = true;
-        //If neither are true, they are concurrent
+
         for (Map.Entry<Integer, Integer> entry : data.entrySet()) {
-            Integer sender = entry.getKey();
+            int sender = entry.getKey();
             int thisValue = entry.getValue();
             int otherValue = other.data.get(sender);
+
             if (thisValue < otherValue) {
-                afterAll = false; //If this vector clock has some value smaller than the other, it means it cannot be after it
+                afterAll = false;
             } else if (thisValue > otherValue) {
-                beforeAll = false; //If this vector clock has some value greater than the other, it means it cannot be before it
+                beforeAll = false;
             }
         }
+
         if (beforeAll && afterAll) {
-            return 0; //They are the same
+            return 0;
         } else if (beforeAll) {
-            return -1; //This vector clock is before the other
+            return -1;
         } else if (afterAll) {
-            return 1; //This vector clock is after the other
+            return 1;
         } else {
-            return 0; //They are concurrent
+            return 0;
         }
     }
 
@@ -122,13 +124,8 @@ public class VectorClock {
             int selfValue = this.data.getOrDefault(server, 0);
             int otherValue = other.data.getOrDefault(server, 0);
 
-            if (selfValue > otherValue) {
-                otherLeqSelf = false;
-            }
-
-            if (otherValue > selfValue) {
-                selfLeqOther = false;
-            }
+            if (selfValue > otherValue) otherLeqSelf = false;
+            if (otherValue > selfValue) selfLeqOther = false;
 
             if (!selfLeqOther && !otherLeqSelf) {
                 return true;
