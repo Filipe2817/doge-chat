@@ -14,8 +14,11 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jeromq.version>0.6.0</jeromq.version>
-        <protobuf.version>4.30.2</protobuf.version>
+        <protoc.version>4.30.2</protoc.version>
         <picocli.version>4.7.6</picocli.version>
+        <rxjava.version>3.1.8</rxjava.version>
+        <grpc.version>1.61.1</grpc.version>
+        <reactive.grpc.version>1.2.4</reactive.grpc.version>
     </properties>
 
     <modules>
