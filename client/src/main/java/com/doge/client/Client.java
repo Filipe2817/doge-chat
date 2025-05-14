@@ -1,6 +1,11 @@
 package com.doge.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+import java.util.Random;
+
+import org.zeromq.ZContext;
 
 import com.doge.client.command.CommandManager;
 import com.doge.client.command.ExitCommand;
@@ -8,8 +13,10 @@ import com.doge.client.command.HelpCommand;
 import com.doge.client.command.LogsCommand;
 import com.doge.client.command.OnlineUsersCommand;
 import com.doge.client.command.SendMessageCommand;
+import com.doge.client.exception.KeyNotFoundException;
 import com.doge.client.handler.ChatMessageHandler;
 import com.doge.client.socket.reactive.ReactiveGrpcClient;
+import com.doge.client.socket.tcp.DhtClient;
 import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.client.socket.zmq.ReqEndpoint;
 import com.doge.client.socket.zmq.SubEndpoint;
@@ -22,35 +29,37 @@ import com.doge.common.proto.MessageWrapper.MessageTypeCase;
 
 public class Client {
     private volatile boolean running;
+
     private final String id;
     private String currentTopic;
+    private int currentChatServer;
+    private InetSocketAddress dhtNode;
 
+    private ZContext context;
     private PushEndpoint pushEndpoint;
     private ReqEndpoint reqEndpoint;
     private SubEndpoint subEndpoint;
     private ReactiveGrpcClient reactiveClient;
+    private DhtClient dhtClient;
 
     private Console console;
     private CommandManager commandManager;
 
     public Client(
-        String name,
-        PushEndpoint pushEndpoint, 
-        ReqEndpoint reqEndpoint, 
-        SubEndpoint subEndpoint,
-        ReactiveGrpcClient reactiveClient,
-        Console console
+        String name, 
+        String topic,
+        InetSocketAddress dhtNode,
+        ZContext context
     ) throws IOException {
-        this.id = name;
-        this.currentTopic = "default";
         this.running = false;
 
-        this.pushEndpoint = pushEndpoint;
-        this.reqEndpoint = reqEndpoint;
-        this.subEndpoint = subEndpoint;
-        this.reactiveClient = reactiveClient;
+        this.id = name;
+        this.currentTopic = topic;
+        this.dhtNode = dhtNode;
 
-        this.console = console;
+        this.context = context;
+
+        this.console = new Console();
         console.alterSystemPrint();
         this.commandManager = new CommandManager();
     }
@@ -67,14 +76,32 @@ public class Client {
         this.currentTopic = currentTopic;
     }
 
-    public void run() {
+    public void run() throws IOException {
         this.running = true;
 
         console.info("Welcome to Doge Chat!");
         console.info("Running client with id: " + id);
+
+        this.dhtClient = new DhtClient(dhtNode.getHostString(), dhtNode.getPort());
+        console.debug("[DHT] Connected to " + dhtNode);
+        console.info("Searching for chat servers serving topic '" + this.currentTopic + "' in DHT...");
+        int chosenChatServer = this.searchByTopic();
+        if (chosenChatServer == -1) {
+            // TODO: Start aggregation at this point
+            this.stop();
+            return;
+        }
+        this.currentChatServer = chosenChatServer;
         
-        console.info("Announcing to server...");
-        this.maybeAnnounceToServer();
+        console.info("Setting up connections to chosen chat server...");
+        this.setupConnectionsToChatServer();
+
+        console.info("Announcing to chat server...");
+        int status = this.maybeAnnounceToServer();
+        if (status == -1) {
+            this.stop();
+            return;
+        }
         
         Thread cliThread = new Thread(() -> this.runCli(), "Cli-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
@@ -136,8 +163,50 @@ public class Client {
             }
         }
     }
+    
+    private int searchByTopic() {
+        try {
+            List<Integer> chatServers = this.dhtClient.search(this.currentTopic);
 
-    private void maybeAnnounceToServer() {
+            // Randomly select a chat server from the list
+            Random random = new Random();
+            int randomIndex = random.nextInt(chatServers.size());
+            int chosenChatServer = chatServers.get(randomIndex);
+
+            console.info("Found chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
+            return chosenChatServer;
+        } catch (KeyNotFoundException e) {
+            console.error("No chat server found for topic '" + this.currentTopic + "'. Starting aggregation...");
+            return -1;
+        } catch (Exception e) {
+            console.error("Error while searching by topic: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    private void setupConnectionsToChatServer() {
+        int pullPort = this.currentChatServer;
+        this.pushEndpoint = new PushEndpoint(this.context);
+        pushEndpoint.connectSocket("localhost", pullPort);
+        console.debug("[PULL] Connected on port " + pullPort);
+        
+        int repPort = this.currentChatServer + 1;
+        this.reqEndpoint = new ReqEndpoint(this.context);
+        reqEndpoint.connectSocket("localhost", repPort);
+        console.debug("[REQ] Connected on port " + repPort);
+
+        int pubPort = this.currentChatServer + 2;
+        this.subEndpoint = new SubEndpoint(this.context);
+        subEndpoint.connectSocket("localhost", pubPort);
+        console.debug("[SUB] Connected on port " + pubPort);
+
+        int reactivePort = this.currentChatServer + 4;
+        this.reactiveClient = new ReactiveGrpcClient(console);
+        reactiveClient.setup("localhost", reactivePort);
+        console.debug("[REACTIVE] Connected on port " + reactivePort);
+    }
+
+    private int maybeAnnounceToServer() {
         AnnounceMessage announceMessage = AnnounceMessage.newBuilder()
                 .setClientId(this.id)
                 .setTopic(this.currentTopic)
@@ -154,24 +223,24 @@ public class Client {
             AnnounceResponseMessage announceResponseMessage = response.getAnnounceResponseMessage();
 
             if (announceResponseMessage.getStatus() != AnnounceResponseMessage.Status.SUCCESS) {
-                console.error("Failed to announce to server. Exiting...");
-                this.stop();
-                return;
+                console.error("Failed to announce to server.");
+                return -1;
             }
 
             console.info("Successfully announced to server. You are now online!");
-        } catch (InvalidFormatException e) {
+            return 0;
+        } catch (Exception e) {
             console.error("[REQ] Error while receiving connect response: " + e.getMessage());
-            return;
+            return -1;
         }
     }
 
     public void stop() {
         this.running = false;
 
-        this.pushEndpoint.close();
-        this.reqEndpoint.close();
-        this.subEndpoint.close();
+        if (this.pushEndpoint != null) this.pushEndpoint.close();
+        if (this.reqEndpoint != null) this.reqEndpoint.close();
+        if (this.subEndpoint != null) this.subEndpoint.close();
 
         try {
             this.console.close();

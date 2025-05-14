@@ -76,7 +76,7 @@ public class Main implements Callable<Integer> {
             int chatServerPubPort = this.port + 3;
             PubEndpoint chatServerPubEndpoint = new PubEndpoint(context);
             chatServerPubEndpoint.bindSocket("localhost", chatServerPubPort);
-            logger.debug("[PUB | Chat Server] Bound to port " + chatServerPubPort);
+            logger.debug("[PUB | Chat server] Bound to port " + chatServerPubPort);
             
             int reactivePort = this.port + 4;
             LogManager logManager = new LogManager();

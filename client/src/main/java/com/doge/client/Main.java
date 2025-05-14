@@ -1,13 +1,11 @@
 package com.doge.client;
 
+import java.net.InetSocketAddress;
 import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
 
-import com.doge.client.socket.reactive.ReactiveGrpcClient;
-import com.doge.client.socket.zmq.PushEndpoint;
-import com.doge.client.socket.zmq.ReqEndpoint;
-import com.doge.client.socket.zmq.SubEndpoint;
+import com.doge.common.InetSocketAddressConverter;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -18,16 +16,27 @@ public class Main implements Callable<Integer> {
     @Option(names = {"-n", "--name"}, required = true, description = "Name of the client to be used as an identifier.")
     private String name;
 
-    @Option(names = {"-cs", "--chat-server"}, required = true, 
+    @Option(names = {"-t", "--topic"}, 
         description = """
-        Port for chat server to connect to.
-        PUSH will use this port.
-        REQ will use this port + 1.
-        SUB will use this port + 2.
-        """, 
-        defaultValue = "5555"
+        Topic to create or join.
+        Can be later changed using the command /topic.
+        """,
+        defaultValue = "default"
     )
-    private int chatServerPort = 5555;
+    private String topic = "default";
+
+    @Option(names = "-dht", required = true,
+        paramLabel = "HOST:PORT",
+        description = """
+        Host and port of the DHT node to connect to.
+        Examples: 
+        - 192.168.1.5:7888;
+        - localhost:4000;
+        - dht.doge.com:5555.
+        """,
+        converter = InetSocketAddressConverter.class
+    )
+    private InetSocketAddress dhtNode;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new Main()).execute(args);
@@ -38,30 +47,14 @@ public class Main implements Callable<Integer> {
     public Integer call() throws Exception {
         ZContext context = null;
         try {
-            Console console = new Console();
             context = new ZContext();
 
-            int pullPort = this.chatServerPort;
-            PushEndpoint pushEndpoint = new PushEndpoint(context);
-            pushEndpoint.connectSocket("localhost", pullPort);
-            console.debug("[PULL] Connected on port " + pullPort);
-            
-            int repPort = this.chatServerPort + 1;
-            ReqEndpoint reqEndpoint = new ReqEndpoint(context);
-            reqEndpoint.connectSocket("localhost", repPort);
-            console.debug("[REQ] Connected on port " + repPort);
-
-            int pubPort = this.chatServerPort + 2;
-            SubEndpoint subEndpoint = new SubEndpoint(context);
-            subEndpoint.connectSocket("localhost", pubPort);
-            console.debug("[SUB] Connected on port " + pubPort);
-
-            int reactivePort = this.chatServerPort + 4;
-            ReactiveGrpcClient reactiveClient = new ReactiveGrpcClient(console);
-            reactiveClient.setup("localhost", reactivePort);
-            console.debug("[REACTIVE] Connected on port " + reactivePort);
-
-            Client client = new Client(name, pushEndpoint, reqEndpoint, subEndpoint, reactiveClient, console);
+            Client client = new Client(
+                name, 
+                topic,
+                dhtNode,
+                context
+            );
             client.run();
 
             return 0;
