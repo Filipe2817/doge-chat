@@ -79,19 +79,19 @@ get_resp(Status, Key, Val, Ref) when Status == ok; Status == error; Status == no
 
 %%%%%%%%%%%%
 
--spec set(binary(), binary()) -> set().
+-spec set(binary(), [binary()]) -> set().
 set(Key, Val) ->
     #set{key = Key, value = Val}.
 
--spec set(binary(), binary(), term()) -> set().
+-spec set(binary(), [binary()], term()) -> set().
 set(Key, Val, Ref) ->
     #set{key = Key, value = Val, ref = Ref}.
 
--spec set_resp(ok | error, binary(), binary()) -> set_response().
+-spec set_resp(ok | error, binary(), [binary()]) -> set_response().
 set_resp(Status, Key, Val) when Status == ok; Status == error ->
     #set_response{status = Status, key = Key, value = Val}.
 
--spec set_resp(ok | error, binary(), binary(), term()) -> set_response().
+-spec set_resp(ok | error, binary(), [binary()], term()) -> set_response().
 set_resp(Status, Key, Val, Ref) when Status == ok; Status == error ->
     #set_response{status = Status, key = Key, value = Val, ref = Ref}.
 

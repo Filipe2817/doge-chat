@@ -127,9 +127,7 @@ handle_call({put, Key, Value}, {CallerPid, _Tag}, State) ->
     if 
         ResponsibleNode =:= MyId ->
             TopicsMap = maps:get(topics, State),
-            CurrentValue = maps:get(Key, TopicsMap, []),
-            NewValue = [Value | CurrentValue],
-            NewTopicsMap = maps:put(Key, NewValue, TopicsMap),
+            NewTopicsMap = maps:put(Key, Value, TopicsMap),
             NewState = maps:put(topics, NewTopicsMap, State),
             {reply, ok, NewState};
         true -> % redirect

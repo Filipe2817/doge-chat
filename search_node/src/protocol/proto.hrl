@@ -34,14 +34,14 @@
 
 -record(set, {
     key     :: binary(),
-    value   :: binary(),
+    value   :: [binary()],
     ref     = undefined
 }).
 
 -record(set_response, {
     status :: ok | error,
     key    :: binary(),
-    value  :: binary(),
+    value  :: [binary()],
     ref    = undefined
 }).
 
