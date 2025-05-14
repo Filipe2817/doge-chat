@@ -21,9 +21,9 @@ public class DhtClient extends Endpoint<JsonNode> {
 
     public List<Integer> search(String key) throws InvalidFormatException, KeyNotFoundException {
         JsonNode message = buildGetMessage(key);
-        send(message);
+        this.send(message);
 
-        JsonNode response = receiveOnceWithoutHandle();
+        JsonNode response = this.receiveOnceWithoutHandle();
         if (response.get("status").asText().equals("ok")) {
             JsonNode data = response.get("data");
             JsonNode values = data.get("value");
