@@ -83,6 +83,7 @@ message ForwardUserOnlineMessage {
 enum ShuffleMessageType {
     REQUEST = 0;
     RESPONSE = 1;
+    BUSY = 2;
 }
 
 message PeerEntry {

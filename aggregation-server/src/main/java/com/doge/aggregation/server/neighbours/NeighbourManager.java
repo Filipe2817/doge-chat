@@ -36,14 +36,16 @@ public class NeighbourManager {
         return neighbours.get(0);
     }
 
-    public void addNeighbour(Neighbour n) {
+    public Neighbour addNeighbour(Neighbour n) {
+        Neighbour removed = null;
         if (cache.size() >= cacheSize) {
             Neighbour oldest = getOldest();
             if (oldest != null) {
-                cache.remove(oldest.getId());
+                removed = cache.remove(oldest.getId());
             }
         }
         cache.put(n.getId(), n);
+        return removed;
     }
 
     public Neighbour remove(Integer id) {
@@ -64,6 +66,10 @@ public class NeighbourManager {
 
     public int size() {
         return cache.size();
+    }
+
+    public boolean isFull() {
+        return cache.size() >= cacheSize;
     }
 
     @Override
