@@ -21,10 +21,7 @@ mvn -pl client exec:java
 You can pass arguments to the client using the `-Dexec.args` option. For example, to make the client connect to a specific chat server, you can run:
 
 ```bash
-mvn -pl client exec:java -Dexec.args="--name rui -cs <port> -dht localhost:7000"
-```
-
-Where the `name` will be used as the client identifier and `cs` stands for chat server.
+mvn -pl client exec:java -Dexec.args="--name rui --topic <topic> --dht localhost:7000"
 
 You can list the available options for the client by running:
 
