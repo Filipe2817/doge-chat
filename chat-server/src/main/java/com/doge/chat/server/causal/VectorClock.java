@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 public class VectorClock {
-    // TODO: Should this be a ConcurrentHashMap?
     private Map<Integer, Integer> data;
 
     public VectorClock(List<Integer> servers) {
@@ -41,6 +40,38 @@ public class VectorClock {
 
         int current = this.data.get(server);
         this.data.put(server, current + 1);
+    }
+
+    // Compare this vector clock to another vector clock
+    //
+    // Returns -1 if this vector clock is BEFORE the other
+    // Returns 1 if this vector clock is AFTER the other
+    // Returns 0 if they are CONCURRENT or are the same
+    public int compare(VectorClock other) {
+        boolean beforeAll = true;
+        boolean afterAll = true;
+
+        for (Map.Entry<Integer, Integer> entry : data.entrySet()) {
+            int sender = entry.getKey();
+            int thisValue = entry.getValue();
+            int otherValue = other.data.get(sender);
+
+            if (thisValue < otherValue) {
+                afterAll = false;
+            } else if (thisValue > otherValue) {
+                beforeAll = false;
+            }
+        }
+
+        if (beforeAll && afterAll) {
+            return 0;
+        } else if (beforeAll) {
+            return -1;
+        } else if (afterAll) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 
     public boolean isCausalDeliverable(VectorClock other, @ServerIdType int server) {
@@ -93,13 +124,8 @@ public class VectorClock {
             int selfValue = this.data.getOrDefault(server, 0);
             int otherValue = other.data.getOrDefault(server, 0);
 
-            if (selfValue > otherValue) {
-                otherLeqSelf = false;
-            }
-
-            if (otherValue > selfValue) {
-                selfLeqOther = false;
-            }
+            if (selfValue > otherValue) otherLeqSelf = false;
+            if (otherValue > selfValue) selfLeqOther = false;
 
             if (!selfLeqOther && !otherLeqSelf) {
                 return true;

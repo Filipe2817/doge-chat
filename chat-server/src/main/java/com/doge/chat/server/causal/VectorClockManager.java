@@ -7,7 +7,6 @@ import java.util.Map;
 public class VectorClockManager {
     private @ServerIdType int selfIdentifier;
 
-    // TODO: Should this be a ConcurrentHashMap?
     private Map<String, VectorClock> vectorClocksPerTopic;
 
     public VectorClockManager(@ServerIdType int selfIdentifier) {

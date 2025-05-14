@@ -80,8 +80,8 @@ public class AnnounceMessageHandler implements MessageHandler<MessageWrapper> {
             String userId = entry.getKey();
             DotSet dots = entry.getValue();
 
-            ForwardUserOnlineMessage.DotStoreMessage.Builder dsBuilder = 
-                ForwardUserOnlineMessage.DotStoreMessage.newBuilder();
+            ForwardUserOnlineMessage.DotSetMessage.Builder dotSetBuilder = 
+                ForwardUserOnlineMessage.DotSetMessage.newBuilder();
 
             for (Pair<Integer, Integer> dot : dots) {
                 ForwardUserOnlineMessage.DotMessage dotMessage =
@@ -90,10 +90,10 @@ public class AnnounceMessageHandler implements MessageHandler<MessageWrapper> {
                         .setClock(dot.getRight())
                         .build();
 
-                dsBuilder.addDot(dotMessage);
+                dotSetBuilder.addDot(dotMessage);
             }
             
-            builder.putDotStore(userId, dsBuilder.build());
+            builder.putDotStore(userId, dotSetBuilder.build());
         }
 
 
