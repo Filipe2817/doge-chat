@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package com.doge.common.proto;
+
+option java_package = "com.doge.common.proto";
+option java_multiple_files = true;
+
+// Chat
+
+message ChatMessage {
+    string topic = 1;
+    string clientId = 2;
+    string content = 3;
+}
+
+message ForwardChatMessage {
+    ChatMessage chatMessage = 1;
+    int32 senderId = 2;
+    map<int32, int32> vectorClock = 3;
+}
+
+// Commands
+
+message GetOnlineUsersMessage {
+    string topic = 1;
+    string clientId = 2;
+}
+
+message GetOnlineUsersResponseMessage {
+    repeated string onlineUsers = 1;
+}
+
+// Logs
+
+message LogRequestMessage {
+    string topic = 1;
+    int32 last = 2;
+}
+
+message UserLogRequestMessage {
+    string topic = 1;
+    int32 last = 2;
+    string userId = 3;
+}
+
+service LogService {
+    rpc GetLogs (LogRequestMessage) returns (stream ChatMessage);
+    rpc GetUserLogs (UserLogRequestMessage) returns (stream ChatMessage);
+}
+
+// Control
+
+message AnnounceMessage {
+    string clientId = 1;
+    string topic = 2;
+}
+
+message AnnounceResponseMessage {
+    enum Status {
+        SUCCESS = 0;
+        FAILURE = 1;
+    }
+
+    Status status = 1;
+}
+
+message ExitMessage {
+    string clientId = 1;
+    string topic = 2;
+}
+
+message ForwardUserOnlineMessage {
+    message DotMessage {
+        int32 serverId = 1;
+        int32 clock = 2;
+    }
+
+    message DotSetMessage {
+        repeated DotMessage dot = 1;
+    }
+
+    string clientId = 1;
+    string topic = 2;
+
+    enum Status {
+        ONLINE = 0;
+        OFFLINE = 1;
+    }
+
+    Status status = 3;
+
+    map<int32, int32> vectorClock = 4;
+
+    // Map from @UserIdType to DotSet
+    map<string, DotSetMessage> dotStore = 5;
+}
+
+// Wrapper
+
+message MessageWrapper {
+    oneof message_type {
+        ChatMessage chatMessage = 1;
+        ForwardChatMessage forwardChatMessage = 2;
+
+        LogRequestMessage logRequestMessage = 3;
+        UserLogRequestMessage userLogRequestMessage = 4;
+
+        GetOnlineUsersMessage getOnlineUsersMessage = 5;
+        GetOnlineUsersResponseMessage getOnlineUsersResponseMessage = 6;
+
+        AnnounceMessage announceMessage = 7;
+        AnnounceResponseMessage announceResponseMessage = 8;
+        ExitMessage exitMessage = 9;
+        ForwardUserOnlineMessage forwardUserOnlineMessage = 10;
+    }
+}
