@@ -1,8 +1,7 @@
 package com.doge.aggregation.server.neighbours;
 
-import com.doge.aggregation.server.Logger;
-import com.doge.aggregation.server.socket.zmq.PullEndpoint;
 import com.doge.aggregation.server.socket.zmq.PushEndpoint;
+import com.doge.common.Logger;
 import com.doge.common.proto.MessageWrapper;
 
 
@@ -12,9 +11,9 @@ public class Neighbour implements Comparable<Neighbour> {
 
     private PushEndpoint pushEndpoint;
 
-    private final Logger logger;
+    private Logger logger;
 
-    public Neighbour(int id, PullEndpoint pullEndpoint, PushEndpoint pushEndpoint, int age, Logger logger) {
+    public Neighbour(int id, PushEndpoint pushEndpoint, int age, Logger logger) {
         this.id = id;
         this.age = age;
 
@@ -27,7 +26,7 @@ public class Neighbour implements Comparable<Neighbour> {
         try {
             pushEndpoint.connectSocket("localhost", this.id);
         } catch (Exception e) {
-            logger.error("Failed to connect to neighbour " + id + ": " + e.getMessage());
+            logger.error("[PUSH] Failed to connect to neighbour '" + id + "': " + e.getMessage());
         }
     }
 
@@ -35,7 +34,7 @@ public class Neighbour implements Comparable<Neighbour> {
         try {
             this.pushEndpoint.close();
         } catch (Exception e) {
-            logger.error("Failed to disconnect from neighbour " + id + ": " + e.getMessage());
+            logger.error("[PUSH] Failed to disconnect from neighbour '" + id + "': " + e.getMessage());
         }
     }
 
@@ -64,7 +63,7 @@ public class Neighbour implements Comparable<Neighbour> {
         try {
             this.pushEndpoint.send(message);
         } catch (Exception e) {
-            logger.error("Failed to send message to neighbour " + id + ": " + e.getMessage());
+            logger.error("[PUSH] Failed to send message to neighbour '" + id + "': " + e.getMessage());
         }
     }
 }

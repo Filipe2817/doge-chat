@@ -18,7 +18,7 @@ public class ZmqPullTransport extends AbstractTransport {
 
     @Override
     public void send(String header, byte[] data) {
-        throw new UnsupportedOperationException("PULL socket does not support send operation");
+        throw new UnsupportedOperationException("[PULL] This socket does not support 'send' operation");
     }
 
     @Override

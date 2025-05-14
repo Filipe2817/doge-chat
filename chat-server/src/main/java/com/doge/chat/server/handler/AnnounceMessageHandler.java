@@ -5,7 +5,6 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.VectorClock;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
@@ -13,6 +12,7 @@ import com.doge.chat.server.user.DotSet;
 import com.doge.chat.server.user.DotStore;
 import com.doge.chat.server.user.OnlineUsersORSet;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 import com.doge.common.proto.AnnounceMessage;
 import com.doge.common.proto.AnnounceResponseMessage;
 import com.doge.common.proto.ForwardUserOnlineMessage;

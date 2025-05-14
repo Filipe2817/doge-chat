@@ -23,6 +23,6 @@ public class ZmqPushTransport extends AbstractTransport {
 
     @Override
     public byte[] receive() {
-        throw new UnsupportedOperationException("PUSH socket does not support receive operation");
+        throw new UnsupportedOperationException("[PUSH] This socket does not support 'receive' operation");
     }
 }

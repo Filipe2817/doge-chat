@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
-import com.doge.aggregation.server.Logger;
+import com.jakewharton.fliptables.FlipTableConverters;
 
 public class NeighbourManager {
     private final int cacheSize;
@@ -74,13 +74,16 @@ public class NeighbourManager {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Neighbours List\n");
-        sb.append(String.format("%-10s | %-10s\n", "ID", "Age"));
-        sb.append("-----------------------------\n");
+        String[] headers = {"Id", "Age"};
+
+        String[][] data = new String[cache.size()][headers.length];
+        int i = 0;
         for (Neighbour n : cache.values()) {
-            sb.append(String.format("%-10d | %-10d\n", n.getId(), n.getAge()));
+            data[i][0] = String.valueOf(n.getId());
+            data[i][1] = String.valueOf(n.getAge());
+            i++;
         }
-        return sb.toString();
+
+        return FlipTableConverters.fromObjects(headers, data);
     }
 }

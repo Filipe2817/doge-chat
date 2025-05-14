@@ -1,17 +1,14 @@
 package com.doge.aggregation.server;
 
-import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.socket.zmq.PushEndpoint;
+import com.doge.common.Logger;
 import com.doge.aggregation.server.neighbours.Neighbour;
 import com.doge.aggregation.server.neighbours.NeighbourManager;
 import com.doge.aggregation.server.socket.zmq.PullEndpoint;
-import com.doge.aggregation.server.AggregationServer;
-import com.doge.aggregation.server.neighbours.NeighbourManager;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
@@ -21,30 +18,25 @@ public class Main implements Callable<Integer> {
         description = """
         First port for the aggregation server to listen on.
         PULL will use this port.
-        PUSH will use this port + 1 for asynchronous client requests.
         """,
         defaultValue = "6666"
     )
     private int port = 6666;
 
     @Option(names = "-c",
-        description = """
-        Size of the view for neighbours.
-        """,
+        description = "Size of the view for neighbours.",
         defaultValue = "5"
     )
     private int c = 5;
 
     @Option(names = "-l",
-        description = """
-        Number of peer-entries to send in the shuffle message.
-        """,
+        description = "Number of peer-entries to send in the shuffle message.",
         defaultValue = "3"
     )
     private int l = 3;
 
     @Option(names = "-i", 
-        description = "ID of the introduction server for an initial shuffle", 
+        description = "Id of the introduction server for an initial CYCLON.", 
         defaultValue = "0"
     )
     private int introId;
@@ -64,26 +56,24 @@ public class Main implements Callable<Integer> {
             int pullPort = this.port;
             PullEndpoint pullEndpoint = new PullEndpoint(context);
             pullEndpoint.bindSocket("localhost", pullPort);
-            logger.debug("ROUTER socket bound to port " + pullPort);
+            logger.debug("[PULL] Bound to port " + pullPort);
 
-            NeighbourManager neighbourManager = new NeighbourManager(
-                this.c
-            );
+            NeighbourManager neighbourManager = new NeighbourManager(this.c);
             
-            // create introduction node
+            // Create introduction node, if provided
             if (this.introId != 0) {
                 PushEndpoint pushEndpoint = new PushEndpoint(context);
                 pushEndpoint.connectSocket("localhost", introId);
-                Neighbour introductionNode = new Neighbour(introId, pullEndpoint, pushEndpoint, 0, logger);
+                Neighbour introductionNode = new Neighbour(introId, pushEndpoint, 0, logger);
                 neighbourManager.addNeighbour(introductionNode);
             }
 
             AggregationServer aggregationServer = new AggregationServer(
                 this.port,
                 this.l,
-                neighbourManager,
-                pullEndpoint,
                 context,
+                pullEndpoint,
+                neighbourManager,
                 logger
             );
             aggregationServer.run();

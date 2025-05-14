@@ -1,8 +1,6 @@
-package com.doge.aggregation.server;
+package com.doge.common;
 
 import java.lang.StackWalker.StackFrame;
-
-import com.doge.common.AbstractLogger;
 
 public class Logger extends AbstractLogger {
     private static final StackWalker WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
@@ -27,4 +25,3 @@ public class Logger extends AbstractLogger {
         return String.format("[%s] [%s] %s", level, caller, message);
     }
 }
-

@@ -18,7 +18,6 @@ public class ZmqPushTransport extends AbstractTransport {
 
     @Override
     public void send(String header, byte[] data) {
-        // Set a send timeout of 5000ms (5 seconds)
         socket.setSendTimeOut(5000);
         boolean sent = socket.send(data, 0);
         if (!sent) {
@@ -29,6 +28,6 @@ public class ZmqPushTransport extends AbstractTransport {
 
     @Override
     public byte[] receive() {
-        throw new UnsupportedOperationException("PUSH socket does not support receive operation");
+        throw new UnsupportedOperationException("[PUSH] This socket does not support 'receive' operation");
     }
 }
