@@ -40,7 +40,7 @@ public class ReactiveGrpcClient {
             .subscribe(
                 resp ->  console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),
-                () -> console.info("[LOGS] Successfully received all logs!")
+                () -> console.info("[LOGS] Successfully received all logs")
             );
     }
 
@@ -57,7 +57,7 @@ public class ReactiveGrpcClient {
             .subscribe(
                 resp -> console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),
-                () -> console.info("[LOGS] Successfully received all logs!")
+                () -> console.info("[LOGS] Successfully received all logs")
             );
     }
 }
