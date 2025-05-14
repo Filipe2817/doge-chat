@@ -165,15 +165,18 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             newNeighbour.connect();
             
             if (neighbourManager.isFull()) {
-                // Adjust index safely
-                if (removalCandidateIndex >= this.candidates.size()) {
-                    removalCandidateIndex = this.candidates.size() - 1;
-                }
+                // Ensure candidates list is not empty before accessing
+                if (!this.candidates.isEmpty()) {
+                    // Adjust index safely
+                    if (removalCandidateIndex >= this.candidates.size()) {
+                        removalCandidateIndex = this.candidates.size() - 1;
+                    }
 
-                Neighbour removed = this.candidates.get(removalCandidateIndex);
-                removed.disconnect();
-                neighbourManager.remove(removed.getId());
-                removalCandidateIndex++;
+                    Neighbour removed = this.candidates.get(removalCandidateIndex);
+                    removed.disconnect();
+                    neighbourManager.remove(removed.getId());
+                    removalCandidateIndex++;
+                }
             }
             
             neighbourManager.addNeighbour(newNeighbour);
