@@ -64,8 +64,11 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
 
         if (shuffleInProgress) {
             MessageWrapper busyMessage = createShuffleMessage(senderId, List.of(), ShuffleMessageType.BUSY);
-            Neighbour sender = createNeighbour(senderId, 0);
+            // Neighbour sender = createNeighbour(senderId, 0);
+            Neighbour sender = new Neighbour(senderId, pullEndpoint, new PushEndpoint(this.context), 0, this.logger);
+            sender.connect();
             sender.sendMessage(busyMessage);
+            sender.disconnect();
             
             logger.warn("Shuffle already in progress, ignoring new shuffle message.");
             return;
@@ -101,7 +104,9 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             if (id.equals(senderId)) {
                 Neighbour sender = neighbourManager.get(senderId);
                 if (sender == null) {
-                    Neighbour newSender = createNeighbour(senderId, 0);
+                    // Neighbour newSender = createNeighbour(senderId, 0);
+                    Neighbour newSender = new Neighbour(senderId, pullEndpoint, new PushEndpoint(this.context), 0, this.logger);
+                    newSender.connect();
                     neighbourManager.addNeighbour(newSender);
                 } else {
                     sender.resetAge();
@@ -114,7 +119,9 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
                 continue;
             }
 
-            Neighbour newNeighbour = createNeighbour(id, age);
+            // Neighbour newNeighbour = createNeighbour(id, age);
+            Neighbour newNeighbour = new Neighbour(id, pullEndpoint, new PushEndpoint(this.context), age, this.logger);
+            newNeighbour.connect();
             
             // If the neighbour manager is full, remove a candidate safely from randomCandidates.
             if (neighbourManager.isFull() && !randomCandidates.isEmpty()) {
@@ -123,6 +130,7 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
                     removalCandidateIndex = randomCandidates.size() - 1;
                 }
                 Neighbour candidateToRemove = randomCandidates.get(removalCandidateIndex);
+                candidateToRemove.disconnect(); // Disconnect the candidate before removal.
                 removalCandidateIndex++; // Increment for subsequent removals.
                 neighbourManager.remove(candidateToRemove.getId());
             }
@@ -155,13 +163,16 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             if (id.equals(aggregationServer.getId()) || neighbourManager.get(id) != null) {
                 continue;
             }
-            Neighbour newNeighbour = createNeighbour(id, age);
+            // Neighbour newNeighbour = createNeighbour(id, age);
+            Neighbour newNeighbour = new Neighbour(id, pullEndpoint, new PushEndpoint(this.context), age, this.logger);
+            newNeighbour.connect();
             
             if (neighbourManager.isFull()) {
                 if (removalCandidateIndex >= this.candidates.size()) {
                     removalCandidateIndex = this.candidates.size() - 1; // adjust index safely
                 }
                 Neighbour removed = this.candidates.get(removalCandidateIndex);
+                removed.disconnect();
                 neighbourManager.remove(removed.getId());
                 removalCandidateIndex++;
             }
@@ -194,7 +205,7 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             this.candidates = neighbourManager.pickRandom(l - 1, oldest); // Exclude the self from the candidates.
             List<Neighbour> candidatesToSend = new ArrayList<>(candidates); // Copy the candidates to send with self
 
-            Neighbour self = createSelfNeighbour(aggregationServer.getId());
+            Neighbour self = new Neighbour(aggregationServer.getId(), pullEndpoint, new PushEndpoint(this.context), 0, this.logger);
             candidatesToSend.add(self);
 
             MessageWrapper shuffleMessage = createShuffleMessage(aggregationServer.getId(), candidatesToSend, ShuffleMessageType.REQUEST);
@@ -225,19 +236,5 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
         return MessageWrapper.newBuilder()
             .setShuffleMessage(shuffleMessageBuilder.build())
             .build();
-    }
-
-    private Neighbour createNeighbour(Integer id, Integer age) {
-        PushEndpoint pushEndpoint = new PushEndpoint(this.context);
-        // Assume the connection uses "localhost" and id as port or part of addressing
-        pushEndpoint.connectSocket("localhost", id);
-        return new Neighbour(id, this.pullEndpoint, pushEndpoint, age, this.logger);
-    }
-
-    // Create a self neighbour (not stored in the manager) when needed.
-    private Neighbour createSelfNeighbour(int id) {
-        PushEndpoint pushEndpoint = new PushEndpoint(this.context);
-        pushEndpoint.connectSocket("localhost", id);
-        return new Neighbour(id, this.pullEndpoint, pushEndpoint, 0, this.logger);
     }
 }

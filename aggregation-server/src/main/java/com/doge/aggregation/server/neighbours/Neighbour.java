@@ -1,7 +1,5 @@
 package com.doge.aggregation.server.neighbours;
 
-import java.util.Objects;
-
 import com.doge.aggregation.server.Logger;
 import com.doge.aggregation.server.socket.zmq.PullEndpoint;
 import com.doge.aggregation.server.socket.zmq.PushEndpoint;
@@ -13,7 +11,6 @@ public class Neighbour implements Comparable<Neighbour> {
     private int age;
 
     private PushEndpoint pushEndpoint;
-    private PullEndpoint pullEndpoint;
 
     private final Logger logger;
 
@@ -21,10 +18,25 @@ public class Neighbour implements Comparable<Neighbour> {
         this.id = id;
         this.age = age;
 
-        this.pullEndpoint = pullEndpoint;
         this.pushEndpoint = pushEndpoint;
 
         this.logger = logger;
+    }
+
+    public void connect() {
+        try {
+            pushEndpoint.connectSocket("localhost", this.id);
+        } catch (Exception e) {
+            logger.error("Failed to connect to neighbour " + id + ": " + e.getMessage());
+        }
+    }
+
+    public void disconnect() {
+        try {
+            this.pushEndpoint.close();
+        } catch (Exception e) {
+            logger.error("Failed to disconnect from neighbour " + id + ": " + e.getMessage());
+        }
     }
 
     public Integer getId() {
