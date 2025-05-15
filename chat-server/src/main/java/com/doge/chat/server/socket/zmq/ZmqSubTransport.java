@@ -18,7 +18,7 @@ public class ZmqSubTransport extends AbstractTransport {
     
     @Override
     public void send(String header, byte[] data) {
-        throw new UnsupportedOperationException("SUB socket does not support send operation");
+        throw new UnsupportedOperationException("[SUB] This socket does not support 'send' operation");
     }
 
     @Override

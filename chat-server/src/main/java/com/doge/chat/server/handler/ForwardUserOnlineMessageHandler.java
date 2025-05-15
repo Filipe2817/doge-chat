@@ -2,12 +2,12 @@ package com.doge.chat.server.handler;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.VectorClock;
 import com.doge.chat.server.user.DotSet;
 import com.doge.chat.server.user.DotStore;
 import com.doge.chat.server.user.OnlineUsersORSet;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 import com.doge.common.proto.ForwardUserOnlineMessage;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.MessageHandler;

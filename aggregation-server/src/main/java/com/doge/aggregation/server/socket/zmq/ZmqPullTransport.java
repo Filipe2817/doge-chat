@@ -1,4 +1,4 @@
-package com.doge.chat.server.socket.zmq;
+package com.doge.aggregation.server.socket.zmq;
 
 import org.zeromq.ZMQ;
 
