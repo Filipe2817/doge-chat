@@ -167,6 +167,10 @@ public class Client {
     private int searchByTopic() {
         try {
             List<Integer> chatServers = this.dhtClient.search(this.currentTopic);
+            if (chatServers.isEmpty()) {
+                console.error("No chat servers available for topic '" + this.currentTopic);
+                return -1;
+            }
 
             // Randomly select a chat server from the list
             Random random = new Random();
