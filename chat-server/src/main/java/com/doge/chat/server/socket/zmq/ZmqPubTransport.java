@@ -24,6 +24,6 @@ public class ZmqPubTransport extends AbstractTransport {
 
     @Override
     public byte[] receive() {
-        throw new UnsupportedOperationException("PUB socket does not support receive operation");
+        throw new UnsupportedOperationException("[PUB] This socket does not support 'receive' operation");
     }
 }

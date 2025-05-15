@@ -5,19 +5,18 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.doge.chat.server.Logger;
 import com.doge.chat.server.causal.VectorClock;
 import com.doge.chat.server.socket.zmq.PubEndpoint;
 import com.doge.chat.server.user.DotSet;
 import com.doge.chat.server.user.DotStore;
 import com.doge.chat.server.user.OnlineUsersORSet;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 import com.doge.common.proto.ExitMessage;
 import com.doge.common.proto.ForwardUserOnlineMessage;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.MessageHandler;
 
-// TODO: Same logic as AnnounceMessageHandler, but for exit messages
 public class ExitMessageHandler implements MessageHandler<MessageWrapper> {
     private final Logger logger;
 

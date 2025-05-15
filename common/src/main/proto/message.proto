@@ -95,6 +95,24 @@ message ForwardUserOnlineMessage {
     map<string, DotSetMessage> dotStore = 5;
 }
 
+// Aggregation
+enum ShuffleMessageType {
+    REQUEST = 0;
+    RESPONSE = 1;
+    BUSY = 2;
+}
+
+message PeerEntry {
+    int32 id      = 1;
+    int32 age     = 2;
+}
+
+message ShuffleMessage {
+    ShuffleMessageType type = 1;
+    int32 senderId = 2;
+    repeated PeerEntry entries = 3;
+}
+
 // Wrapper
 
 message MessageWrapper {
@@ -112,5 +130,7 @@ message MessageWrapper {
         AnnounceResponseMessage announceResponseMessage = 8;
         ExitMessage exitMessage = 9;
         ForwardUserOnlineMessage forwardUserOnlineMessage = 10;
+
+        ShuffleMessage shuffleMessage = 11;
     }
 }

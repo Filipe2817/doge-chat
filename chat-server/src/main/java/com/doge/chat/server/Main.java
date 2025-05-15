@@ -15,6 +15,7 @@ import com.doge.chat.server.socket.zmq.PullEndpoint;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
 import com.doge.chat.server.socket.zmq.SubEndpoint;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;

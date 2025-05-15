@@ -2,9 +2,9 @@ package com.doge.chat.server.handler;
 
 import java.util.Set;
 
-import com.doge.chat.server.Logger;
 import com.doge.chat.server.socket.zmq.RepEndpoint;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 import com.doge.common.proto.GetOnlineUsersMessage;
 import com.doge.common.proto.GetOnlineUsersResponseMessage;
 import com.doge.common.proto.MessageWrapper;
