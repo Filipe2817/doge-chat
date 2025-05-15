@@ -50,6 +50,11 @@ public class Endpoint<M> implements AutoCloseable {
         handler.handle(message);
     }
 
+    public M receiveOnceWithoutHandle() throws InvalidFormatException {
+        byte[] rawMessage = this.transport.receive();
+        return this.codec.decode(rawMessage);
+    }
+
     @Override
     public void close() {
         this.transport.close();

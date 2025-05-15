@@ -18,5 +18,3 @@ logs
 *.iml
 rebar3.crashdump
 *~
-
-store/
