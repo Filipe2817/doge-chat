@@ -4,11 +4,11 @@ import java.util.List;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.zmq.ReqEndpoint;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.GetOnlineUsersMessage;
 import com.doge.common.proto.GetOnlineUsersResponseMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.socket.zmq.ReqEndpoint;
 
 public class OnlineUsersCommand extends AbstractCommand {
     private final Client client;
@@ -35,7 +35,7 @@ public class OnlineUsersCommand extends AbstractCommand {
         String clientId = client.getId();
 
         MessageWrapper wrapper = this.createGetOnlineUsersMessage(topic, clientId);
-        this.reqEndpoint.send(topic, wrapper);
+        this.reqEndpoint.send(wrapper);
         
         try {
             MessageWrapper responseWrapper = this.reqEndpoint.receiveOnceWithoutHandle();

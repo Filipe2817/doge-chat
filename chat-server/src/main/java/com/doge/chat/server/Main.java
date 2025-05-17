@@ -10,12 +10,12 @@ import com.doge.chat.server.causal.VectorClockManager;
 import com.doge.chat.server.log.LogManager;
 import com.doge.chat.server.socket.reactive.ReactiveGrpcEndpoint;
 import com.doge.chat.server.socket.reactive.ReactiveLogService;
-import com.doge.chat.server.socket.zmq.PubEndpoint;
-import com.doge.chat.server.socket.zmq.PullEndpoint;
-import com.doge.chat.server.socket.zmq.RepEndpoint;
-import com.doge.chat.server.socket.zmq.SubEndpoint;
 import com.doge.chat.server.user.UserManager;
 import com.doge.common.Logger;
+import com.doge.common.socket.zmq.PubEndpoint;
+import com.doge.common.socket.zmq.PullEndpoint;
+import com.doge.common.socket.zmq.RepEndpoint;
+import com.doge.common.socket.zmq.SubEndpoint;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -30,9 +30,11 @@ public class Main implements Callable<Integer> {
         description = """
         First port for the chat server to listen on.
         PULL will use this port.
-        REQ will use this port + 1 for synchronous client requests.
+        REP will use this port + 1 for synchronous client and
+        aggregation server requests.
         PUB will use this port + 2 for clients.
         PUB will use this port + 3 for other chat servers.
+        REACTIVE will use this port + 4 for reactive gRPC.
         """,
         defaultValue = "5555"
     )

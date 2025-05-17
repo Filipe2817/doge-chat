@@ -1,7 +1,5 @@
 package com.doge.aggregation.server;
 
-import com.doge.aggregation.server.socket.zmq.PullEndpoint;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,11 +7,17 @@ import java.util.concurrent.TimeUnit;
 import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.handler.ShuffleMessageHandler;
-import com.doge.aggregation.server.neighbours.NeighbourManager;
+import com.doge.aggregation.server.neighbour.NeighbourManager;
+import com.doge.aggregation.server.gossip.GossipManager;
+import com.doge.aggregation.server.handler.AggregationCurrentStateMessageHandler;
+import com.doge.aggregation.server.handler.AggregationStartMessageHandler;
 import com.doge.common.Logger;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
+import com.doge.common.socket.zmq.PullEndpoint;
+import com.doge.common.socket.zmq.RepEndpoint;
+import com.doge.common.socket.zmq.ReqEndpoint;
 
 public class AggregationServer {
     private volatile boolean running;
@@ -22,8 +26,11 @@ public class AggregationServer {
 
     private ZContext context;
     private PullEndpoint pullEndpoint;
+    private RepEndpoint repEndpoint;
+    private ReqEndpoint reqEndpoint;
 
     private NeighbourManager neighbourManager;
+    private GossipManager gossipManager;
     private Logger logger;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -33,6 +40,8 @@ public class AggregationServer {
         int l,
         ZContext context,
         PullEndpoint pullEndpoint,
+        RepEndpoint repEndpoint,
+        ReqEndpoint reqEndpoint,
         NeighbourManager neighbourManager,
         Logger logger
     ) {
@@ -42,9 +51,12 @@ public class AggregationServer {
 
         this.context = context;
         this.pullEndpoint = pullEndpoint;
+        this.repEndpoint = repEndpoint;
+        this.reqEndpoint = reqEndpoint;
 
         this.neighbourManager = neighbourManager;
         this.logger = logger;
+        this.gossipManager = new GossipManager(this.neighbourManager, this.logger);
     }
 
     public int getId() {
@@ -55,12 +67,17 @@ public class AggregationServer {
         this.running = true;
 
         Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
+        Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
 
         try {
             pullThread.start();
+            repThread.start();
+
             pullThread.join();
+            repThread.join();
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            pullThread.interrupt();
+            repThread.interrupt();
         } finally {
             this.stop();
         }
@@ -76,6 +93,12 @@ public class AggregationServer {
         );
 
         this.pullEndpoint.on(MessageTypeCase.SHUFFLEMESSAGE, shuffleMessageHandler);
+        this.pullEndpoint.on(MessageTypeCase.AGGREGATIONCURRENTSTATEMESSAGE, new AggregationCurrentStateMessageHandler(
+            this.repEndpoint,
+            this.reqEndpoint,
+            this.gossipManager,
+            this.logger
+        ));
 
         // Schedule periodic shuffle trigger every 10 seconds
         scheduler.scheduleAtFixedRate(() -> {
@@ -89,11 +112,28 @@ public class AggregationServer {
         while (this.running) {
             try {
                 this.pullEndpoint.receiveOnce();
-
-                logger.debug("Neighbours Cache");
-                System.out.println(this.neighbourManager);
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
+                continue;
+            } catch (Exception e) {
+                e.printStackTrace();
+                break;
+            }
+        }
+    }
+
+    private void runRep() {
+        this.repEndpoint.on(MessageTypeCase.AGGREGATIONSTARTMESSAGE, new AggregationStartMessageHandler(
+            this.reqEndpoint,
+            this.gossipManager,
+            this.logger
+        ));
+
+        while (this.running) {
+            try {
+                this.repEndpoint.receiveOnce();
+            } catch (HandlerNotFoundException | InvalidFormatException e) {
+                logger.debug("[REP] Error while receiving message: " + e.getMessage());
                 continue;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -114,6 +154,10 @@ public class AggregationServer {
             logger.error("Error shutting down scheduler: " + e.getMessage());
             return;
         }
+
+        this.pullEndpoint.close();
+        this.repEndpoint.close();
+        this.reqEndpoint.close();
 
         logger.info("Aggregation server stopped");
     }

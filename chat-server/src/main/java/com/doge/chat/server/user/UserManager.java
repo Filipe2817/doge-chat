@@ -18,6 +18,12 @@ public class UserManager {
         this.onlineUsersPerTopic = new HashMap<>();
     }
 
+    public int getTotalUsers() {
+        return this.onlineUsersPerTopic.values().stream()
+                .mapToInt(onlineUsersORSet -> onlineUsersORSet.getOnlineUsers().size())
+                .sum();
+    }
+
     public void addTopic(String topic, List<Integer> servers) {
         OnlineUsersORSet onlineUsersORSet = new OnlineUsersORSet(this.selfIdentifier, servers);
         this.onlineUsersPerTopic.put(topic, onlineUsersORSet);

@@ -34,9 +34,20 @@ public class Main implements Callable<Integer> {
         - localhost:4000;
         - dht.doge.com:5555.
         """,
+        defaultValue = "127.0.0.1:8000",
         converter = InetSocketAddressConverter.class
     )
     private InetSocketAddress dhtNode;
+
+    @Option(names = "-as", 
+        description = """
+        Id of the aggregation server to connect to.
+        Aggregation servers are used for aggregating chat
+        servers whenever a new topic is created.
+        """,
+        required = true
+    )
+    private int aggregationServerId;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new Main()).execute(args);
@@ -53,6 +64,7 @@ public class Main implements Callable<Integer> {
                 name, 
                 topic,
                 dhtNode,
+                aggregationServerId,
                 context
             );
             client.run();

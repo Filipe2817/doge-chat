@@ -95,7 +95,8 @@ message ForwardUserOnlineMessage {
     map<string, DotSetMessage> dotStore = 5;
 }
 
-// Aggregation
+// CYCLON
+
 enum ShuffleMessageType {
     REQUEST = 0;
     RESPONSE = 1;
@@ -103,14 +104,40 @@ enum ShuffleMessageType {
 }
 
 message PeerEntry {
-    int32 id      = 1;
-    int32 age     = 2;
+    int32 id = 1;
+    int32 age = 2;
 }
 
 message ShuffleMessage {
     ShuffleMessageType type = 1;
     int32 senderId = 2;
     repeated PeerEntry entries = 3;
+}
+
+// Aggregation
+
+message AggregationStartMessage {
+    string topic = 1;
+    string clientId = 2; // Will serve as id of the aggregation
+}
+
+message AggregationResultMessage {
+    string topic = 1;
+    repeated int32 serverIds = 2;
+}
+
+message ChatServerStateMessage {
+    int32 id = 1;
+    int32 userCount = 2;
+    int32 topicCount = 3;
+}
+
+message GetChatServerStateMessage {}
+
+message AggregationCurrentStateMessage {
+    string aggregationId = 1;
+    string topic = 2;
+    repeated ChatServerStateMessage chatServerStates = 3;
 }
 
 // Wrapper
@@ -132,5 +159,11 @@ message MessageWrapper {
         ForwardUserOnlineMessage forwardUserOnlineMessage = 10;
 
         ShuffleMessage shuffleMessage = 11;
+
+        AggregationStartMessage aggregationStartMessage = 12;
+        AggregationResultMessage aggregationResultMessage = 13;
+        AggregationCurrentStateMessage aggregationCurrentStateMessage = 14;
+        GetChatServerStateMessage getChatServerStateMessage = 15;
+        ChatServerStateMessage chatServerStateMessage = 16;
     }
 }

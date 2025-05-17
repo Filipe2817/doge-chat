@@ -4,11 +4,13 @@ import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
 
-import com.doge.aggregation.server.socket.zmq.PushEndpoint;
+import com.doge.aggregation.server.neighbour.Neighbour;
+import com.doge.aggregation.server.neighbour.NeighbourManager;
 import com.doge.common.Logger;
-import com.doge.aggregation.server.neighbours.Neighbour;
-import com.doge.aggregation.server.neighbours.NeighbourManager;
-import com.doge.aggregation.server.socket.zmq.PullEndpoint;
+import com.doge.common.socket.zmq.PullEndpoint;
+import com.doge.common.socket.zmq.PushEndpoint;
+import com.doge.common.socket.zmq.RepEndpoint;
+import com.doge.common.socket.zmq.ReqEndpoint;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
@@ -18,10 +20,20 @@ public class Main implements Callable<Integer> {
         description = """
         First port for the aggregation server to listen on.
         PULL will use this port.
+        REP will use this port + 1 for synchronous client requests.
         """,
         defaultValue = "6666"
     )
     private int port = 6666;
+
+    @Option(names = "-cs",
+        description = """
+        Port for the chat server corresponding to this aggregation server.
+        REQ will use this port + 1 for requesting to its chat server.
+        """,
+        defaultValue = "5555"
+    )
+    private int chatServerPort = 5555;
 
     @Option(names = "-c",
         description = "Size of the view for neighbours.",
@@ -58,9 +70,19 @@ public class Main implements Callable<Integer> {
             pullEndpoint.bindSocket("localhost", pullPort);
             logger.debug("[PULL] Bound to port " + pullPort);
 
+            int reqPort = this.chatServerPort + 1;
+            ReqEndpoint reqEndpoint = new ReqEndpoint(context);
+            reqEndpoint.connectSocket("localhost", reqPort);
+            logger.debug("[REQ] Connected to port " + reqPort);
+
+            int repPort = this.port + 1;
+            RepEndpoint repEndpoint = new RepEndpoint(context);
+            repEndpoint.bindSocket("localhost", repPort);
+            logger.debug("[REP] Bound to port " + repPort);
+
             NeighbourManager neighbourManager = new NeighbourManager(this.c);
             
-            // Create introduction node, if provided
+            // Create introduction neighbour, if provided
             if (this.introId != 0) {
                 PushEndpoint pushEndpoint = new PushEndpoint(context);
                 pushEndpoint.connectSocket("localhost", introId);
@@ -73,6 +95,8 @@ public class Main implements Callable<Integer> {
                 this.l,
                 context,
                 pullEndpoint,
+                repEndpoint,
+                reqEndpoint,
                 neighbourManager,
                 logger
             );

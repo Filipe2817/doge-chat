@@ -17,15 +17,17 @@ import com.doge.client.exception.KeyNotFoundException;
 import com.doge.client.handler.ChatMessageHandler;
 import com.doge.client.socket.reactive.ReactiveGrpcClient;
 import com.doge.client.socket.tcp.DhtClient;
-import com.doge.client.socket.zmq.PushEndpoint;
-import com.doge.client.socket.zmq.ReqEndpoint;
-import com.doge.client.socket.zmq.SubEndpoint;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
+import com.doge.common.proto.AggregationResultMessage;
 import com.doge.common.proto.AnnounceMessage;
 import com.doge.common.proto.AnnounceResponseMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.proto.AggregationStartMessage;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
+import com.doge.common.socket.zmq.PushEndpoint;
+import com.doge.common.socket.zmq.ReqEndpoint;
+import com.doge.common.socket.zmq.SubEndpoint;
 
 public class Client {
     private volatile boolean running;
@@ -34,10 +36,12 @@ public class Client {
     private String currentTopic;
     private int currentChatServer;
     private InetSocketAddress dhtNode;
+    private int aggregationServerId;
 
     private ZContext context;
     private PushEndpoint pushEndpoint;
-    private ReqEndpoint reqEndpoint;
+    private ReqEndpoint chatServerReqEndpoint;
+    private ReqEndpoint aggregationServerReqEndpoint;
     private SubEndpoint subEndpoint;
     private ReactiveGrpcClient reactiveClient;
     private DhtClient dhtClient;
@@ -49,6 +53,7 @@ public class Client {
         String name, 
         String topic,
         InetSocketAddress dhtNode,
+        int aggregationServerId,
         ZContext context
     ) throws IOException {
         this.running = false;
@@ -56,6 +61,7 @@ public class Client {
         this.id = name;
         this.currentTopic = topic;
         this.dhtNode = dhtNode;
+        this.aggregationServerId = aggregationServerId;
 
         this.context = context;
 
@@ -84,13 +90,25 @@ public class Client {
 
         this.dhtClient = new DhtClient(dhtNode.getHostString(), dhtNode.getPort());
         console.debug("[DHT] Connected to " + dhtNode);
+
+        this.aggregationServerReqEndpoint = new ReqEndpoint(this.context);
+        this.aggregationServerReqEndpoint.connectSocket("localhost", aggregationServerId);
+        console.debug("[REQ | Aggregation server] Connected to " + aggregationServerId);
+
         console.info("Searching for chat servers serving topic '" + this.currentTopic + "' in DHT...");
         int chosenChatServer = this.searchByTopic();
+
         if (chosenChatServer == -1) {
-            // TODO: Start aggregation at this point
-            this.stop();
-            return;
+            console.info("Starting aggregation...");
+
+            chosenChatServer = this.startAggregation();
+            if (chosenChatServer == -1) {
+                console.error("Failed to aggregate");
+                this.stop();
+                return;
+            }
         }
+
         this.currentChatServer = chosenChatServer;
         
         console.info("Setting up connections to chosen chat server...");
@@ -122,7 +140,7 @@ public class Client {
     private void runCli() {
         this.commandManager.registerCommand(new SendMessageCommand(this, this.pushEndpoint));
         this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
-        this.commandManager.registerCommand(new OnlineUsersCommand(this, this.reqEndpoint));
+        this.commandManager.registerCommand(new OnlineUsersCommand(this, this.chatServerReqEndpoint));
         this.commandManager.registerCommand(new LogsCommand(this, this.reactiveClient));
         
         HelpCommand helpCommand = new HelpCommand(this.commandManager);
@@ -180,10 +198,41 @@ public class Client {
             console.info("Found chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
             return chosenChatServer;
         } catch (KeyNotFoundException e) {
-            console.error("No chat server found for topic '" + this.currentTopic + "'. Starting aggregation...");
+            console.error("No chat server found for topic '" + this.currentTopic + "'");
             return -1;
         } catch (Exception e) {
-            console.error("Error while searching by topic: " + e.getMessage());
+            console.error("[DHT] Error while searching by topic: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    private int startAggregation() {
+        AggregationStartMessage startAggregationMessage = AggregationStartMessage.newBuilder()
+                .setClientId(this.id)
+                .setTopic(this.currentTopic)
+                .build();
+
+        MessageWrapper messageWrapper = MessageWrapper.newBuilder()
+                .setAggregationStartMessage(startAggregationMessage)
+                .build();
+
+        this.aggregationServerReqEndpoint.send(messageWrapper);
+
+        try {
+            MessageWrapper response = this.aggregationServerReqEndpoint.receiveOnceWithoutHandle();
+            AggregationResultMessage result = response.getAggregationResultMessage();
+            List<Integer> chatServers = result.getServerIdsList();
+            console.warn("Got response from aggregation server. Found C chat servers: " + chatServers);
+
+            // Randomly select a chat server from the list
+            Random random = new Random();
+            int randomIndex = random.nextInt(chatServers.size());
+            int chosenChatServer = chatServers.get(randomIndex);
+
+            console.info("Chose chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
+            return chosenChatServer;
+        } catch (Exception e) {
+            console.error("[REQ | Aggregation server] Error while receiving aggregation result: " + e.getMessage());
             return -1;
         }
     }
@@ -195,9 +244,9 @@ public class Client {
         console.debug("[PULL] Connected on port " + pullPort);
         
         int repPort = this.currentChatServer + 1;
-        this.reqEndpoint = new ReqEndpoint(this.context);
-        reqEndpoint.connectSocket("localhost", repPort);
-        console.debug("[REQ] Connected on port " + repPort);
+        this.chatServerReqEndpoint = new ReqEndpoint(this.context);
+        chatServerReqEndpoint.connectSocket("localhost", repPort);
+        console.debug("[REQ | Chat server] Connected on port " + repPort);
 
         int pubPort = this.currentChatServer + 2;
         this.subEndpoint = new SubEndpoint(this.context);
@@ -220,10 +269,10 @@ public class Client {
                 .setAnnounceMessage(announceMessage)
                 .build();
 
-        this.reqEndpoint.send(messageWrapper);
+        this.chatServerReqEndpoint.send(messageWrapper);
 
         try {
-            MessageWrapper response = this.reqEndpoint.receiveOnceWithoutHandle();
+            MessageWrapper response = this.chatServerReqEndpoint.receiveOnceWithoutHandle();
             AnnounceResponseMessage announceResponseMessage = response.getAnnounceResponseMessage();
 
             if (announceResponseMessage.getStatus() != AnnounceResponseMessage.Status.SUCCESS) {
@@ -243,7 +292,8 @@ public class Client {
         this.running = false;
 
         if (this.pushEndpoint != null) this.pushEndpoint.close();
-        if (this.reqEndpoint != null) this.reqEndpoint.close();
+        if (this.chatServerReqEndpoint != null) this.chatServerReqEndpoint.close();
+        if (this.aggregationServerReqEndpoint != null) this.aggregationServerReqEndpoint.close();
         if (this.subEndpoint != null) this.subEndpoint.close();
 
         try {
