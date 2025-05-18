@@ -8,6 +8,7 @@ import com.doge.client.exception.KeyNotFoundException;
 import com.doge.common.codec.JsonCodec;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.socket.Endpoint;
+import com.doge.common.socket.tcp.TcpTransport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

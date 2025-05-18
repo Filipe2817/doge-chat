@@ -18,7 +18,7 @@ public class Main implements Callable<Integer> {
 
     @Option(names = {"-t", "--topic"}, 
         description = """
-        Topic to create or join.
+        Topic to join or create.
         Can be later changed using the command /topic.
         """,
         defaultValue = "default"

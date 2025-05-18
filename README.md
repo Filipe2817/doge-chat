@@ -37,10 +37,8 @@ mvn -pl client exec:java -Dexec.args="--help"
 Running a chat server:
 
 ```bash
-mvn -pl chat-server exec:java -Dexec.args="--subscriber-ports 5558,6558" # can also use -sub
+mvn -pl chat-server exec:java -Dexec.args="-p 5555"
 ```
-
-Note that these are the ports that the SUB socket will connect to, which should have PUB sockets bound to them.
 
 You can list the available options for the chat server by running:
 
@@ -49,7 +47,7 @@ mvn -pl chat-server exec:java -Dexec.args="--help"
 ```
 
 > [!NOTE]
-> Make sure you understand the role of the `-p` flag, since it is crucial for the server workflow. For example, if `-p` is set to `5555`, the server will bind a PULL socket to it. Subsequent port numbers will be used for PUB sockets.
+> Make sure you understand the role of the `-p` flag, since it is crucial for the server workflow. For example, if `-p` is set to `5555`, the server will bind a PULL socket to it. Subsequent port numbers will be used for other types of sockets.
 
 #### 💡 Tips
 

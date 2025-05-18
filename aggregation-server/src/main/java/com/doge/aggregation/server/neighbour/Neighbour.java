@@ -24,6 +24,7 @@ public class Neighbour implements Comparable<Neighbour> {
     public void connect() {
         try {
             pushEndpoint.connectSocket("localhost", this.id);
+            pushEndpoint.setLinger(2000);
         } catch (Exception e) {
             logger.error("[PUSH] Failed to connect to neighbour '" + id + "': " + e.getMessage());
         }

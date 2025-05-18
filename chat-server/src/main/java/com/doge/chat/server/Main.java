@@ -1,8 +1,6 @@
 package com.doge.chat.server;
 
-import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 import org.zeromq.ZContext;
 
@@ -23,9 +21,6 @@ import picocli.CommandLine.Option;
 
 @Command(name = "chat-server", mixinStandardHelpOptions = true)
 public class Main implements Callable<Integer> {
-    @Option(names = "-t", description = "Topic to handle", defaultValue = "default")
-    private String topic = "default";
-
     @Option(names = "-p",
         description = """
         First port for the chat server to listen on.
@@ -39,9 +34,6 @@ public class Main implements Callable<Integer> {
         defaultValue = "5555"
     )
     private int port = 5555;
-
-    @Option(names = {"-sub", "--subscriber-ports"}, split = ",", required = true, description = "Comma-separated list of ports for chat servers to connect to")
-    private List<Integer> chatServerPorts;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new Main()).execute(args);
@@ -59,13 +51,7 @@ public class Main implements Callable<Integer> {
             PullEndpoint pullEndpoint = new PullEndpoint(context);
             pullEndpoint.bindSocket("localhost", pullPort);
             logger.debug("[PULL] Bound to port " + pullPort);
-            
-            SubEndpoint subEndpoint = new SubEndpoint(context);
-            for (Integer port : this.chatServerPorts) {
-                subEndpoint.connectSocket("localhost", port);
-                logger.debug("[SUB] Connected to port " + port);
-            }
-            
+
             int repPort = this.port + 1;
             RepEndpoint repEndpoint = new RepEndpoint(context);
             repEndpoint.bindSocket("localhost", repPort);
@@ -87,23 +73,17 @@ public class Main implements Callable<Integer> {
             ReactiveGrpcEndpoint reactiveEndpoint = new ReactiveGrpcEndpoint(reactivePort, logService);
             logger.debug("[REACTIVE] Initialized on port " + reactivePort);
 
-            VectorClockManager vectorClockManager = new VectorClockManager(this.port);
-            UserManager userManager = new UserManager(this.port);
-            
-            List<Integer> chatServerPorts = this.chatServerPorts.stream()
-                .map(port -> port - 3)
-                .collect(Collectors.toList());
-            chatServerPorts.add(this.port);
-            
-            vectorClockManager.addTopic(topic, chatServerPorts);
-            logger.debug("Vector clock manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
+            SubEndpoint subEndpoint = new SubEndpoint(context);
+            logger.debug("[SUB] Ready to connect to other chat servers");
 
-            userManager.addTopic(topic, chatServerPorts);
-            logger.debug("User manager initialized for topic " + "'" + topic + "' with identifiers " + chatServerPorts);
+            VectorClockManager vectorClockManager = new VectorClockManager(this.port);
+            logger.debug("Vector clock manager initialized for port " + this.port);
+
+            UserManager userManager = new UserManager(this.port);
+            logger.debug("User manager initialized for port " + this.port);
 
             ChatServer chatServer = new ChatServer(
                 this.port,
-                this.topic,
                 pullEndpoint,
                 subEndpoint,
                 repEndpoint,

@@ -142,7 +142,7 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
                 logger.info("Sent shuffle response to neighbour '" + senderId + "'");
 
                 logger.info("Neigbours cache");
-                logger.info(neighbourManager.toString());
+                System.out.println(neighbourManager.toString());
             } catch (Exception e) {
                 logger.error("Failed to send shuffle response, neighbour may be unreachable: " + e.getMessage());
             }

@@ -32,12 +32,11 @@ public class ReactiveLogService extends Rx3LogServiceGrpc.LogServiceImplBase {
             // This way, we maximize for having a strong consistency
             // regarding the logs each client receives
             return Flowable.defer(() -> {
-                List<LogMessage> snapshot = this.logManager.snapshot();
+                List<LogMessage> snapshot = this.logManager.snapshot(req.getTopic());
 
                 return Flowable
                     .fromIterable(snapshot)
                     .map(log -> log.chatMessage())
-                    .filter(log -> log.getTopic().equals(req.getTopic()))
                     .takeLast(req.getLast());
             })
             .doOnComplete(() -> logger.debug("Completed log request for topic '" + req.getTopic() + "'"));
@@ -49,13 +48,12 @@ public class ReactiveLogService extends Rx3LogServiceGrpc.LogServiceImplBase {
         return request.flatMapPublisher(req -> {
             // Refer to above comment
             return Flowable.defer(() -> {
-                List<LogMessage> snapshot = this.logManager.snapshot();
+                List<LogMessage> snapshot = this.logManager.snapshot(req.getTopic());
 
                 return Flowable
                     .fromIterable(snapshot)
                     .map(log -> log.chatMessage())
                     .filter(log -> log.getClientId().equals(req.getUserId()))
-                    .filter(log -> log.getTopic().equals(req.getTopic()))
                     .takeLast(req.getLast());
             })
             .doOnComplete(() -> logger.debug("Completed log request for user '" + req.getUserId() + "' and topic '" + req.getTopic() + "'"));

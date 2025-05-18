@@ -1,11 +1,14 @@
 package com.doge.aggregation.server;
 
+import java.net.InetSocketAddress;
 import java.util.concurrent.Callable;
 
 import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.neighbour.Neighbour;
 import com.doge.aggregation.server.neighbour.NeighbourManager;
+import com.doge.aggregation.server.socket.tcp.DhtClient;
+import com.doge.common.InetSocketAddressConverter;
 import com.doge.common.Logger;
 import com.doge.common.socket.zmq.PullEndpoint;
 import com.doge.common.socket.zmq.PushEndpoint;
@@ -34,6 +37,20 @@ public class Main implements Callable<Integer> {
         defaultValue = "5555"
     )
     private int chatServerPort = 5555;
+
+    @Option(names = "-dht", required = true,
+        paramLabel = "HOST:PORT",
+        description = """
+        Host and port of the DHT node to connect to.
+        Examples: 
+        - 192.168.1.5:7888;
+        - localhost:4000;
+        - dht.doge.com:5555.
+        """,
+        defaultValue = "127.0.0.1:8000",
+        converter = InetSocketAddressConverter.class
+    )
+    private InetSocketAddress dhtNode;
 
     @Option(names = "-c",
         description = "Size of the view for neighbours.",
@@ -80,6 +97,9 @@ public class Main implements Callable<Integer> {
             repEndpoint.bindSocket("localhost", repPort);
             logger.debug("[REP] Bound to port " + repPort);
 
+            DhtClient dhtClient = new DhtClient(dhtNode.getHostString(), dhtNode.getPort());
+            logger.debug("[DHT] Connected to " + dhtNode);
+
             NeighbourManager neighbourManager = new NeighbourManager(this.c);
             
             // Create introduction neighbour, if provided
@@ -97,6 +117,7 @@ public class Main implements Callable<Integer> {
                 pullEndpoint,
                 repEndpoint,
                 reqEndpoint,
+                dhtClient,
                 neighbourManager,
                 logger
             );

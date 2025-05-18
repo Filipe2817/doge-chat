@@ -118,7 +118,7 @@ message ShuffleMessage {
 
 message AggregationStartMessage {
     string topic = 1;
-    string clientId = 2; // Will serve as id of the aggregation
+    string dotClientId = 2; // Will serve as id of the aggregation
 }
 
 message AggregationResultMessage {
@@ -138,6 +138,15 @@ message AggregationCurrentStateMessage {
     string aggregationId = 1;
     string topic = 2;
     repeated ChatServerStateMessage chatServerStates = 3;
+}
+
+message NotifyNewTopicMessage {
+    string topic = 1;
+    repeated int32 otherServerIds = 2;
+}
+
+message NotifyNewTopicAckMessage {
+    string topic = 1;
 }
 
 // Wrapper
@@ -165,5 +174,7 @@ message MessageWrapper {
         AggregationCurrentStateMessage aggregationCurrentStateMessage = 14;
         GetChatServerStateMessage getChatServerStateMessage = 15;
         ChatServerStateMessage chatServerStateMessage = 16;
+        NotifyNewTopicMessage notifyNewTopicMessage = 17;
+        NotifyNewTopicAckMessage notifyNewTopicAckMessage = 18;
     }
 }

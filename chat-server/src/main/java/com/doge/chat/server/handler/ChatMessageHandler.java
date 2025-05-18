@@ -23,13 +23,13 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
     private final LogManager logsManager;
 
     public ChatMessageHandler(
-            ChatServer chatServer,
-            Logger logger,
-            PubEndpoint clientPubEndpoint,
-            PubEndpoint chatServerPubEndpoint,
-            VectorClockManager vectorClockManager,
-            LogManager logsManager
-            ) {
+        ChatServer chatServer,
+        Logger logger,
+        PubEndpoint clientPubEndpoint,
+        PubEndpoint chatServerPubEndpoint,
+        VectorClockManager vectorClockManager,
+        LogManager logsManager
+    ) {
         this.chatServer = chatServer;
         this.logger = logger;
 

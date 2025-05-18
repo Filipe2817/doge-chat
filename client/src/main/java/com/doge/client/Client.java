@@ -13,6 +13,7 @@ import com.doge.client.command.HelpCommand;
 import com.doge.client.command.LogsCommand;
 import com.doge.client.command.OnlineUsersCommand;
 import com.doge.client.command.SendMessageCommand;
+import com.doge.client.command.TopicCommand;
 import com.doge.client.exception.KeyNotFoundException;
 import com.doge.client.handler.ChatMessageHandler;
 import com.doge.client.socket.reactive.ReactiveGrpcClient;
@@ -37,6 +38,7 @@ public class Client {
     private int currentChatServer;
     private InetSocketAddress dhtNode;
     private int aggregationServerId;
+    private int aggregationCount;
 
     private ZContext context;
     private PushEndpoint pushEndpoint;
@@ -62,6 +64,7 @@ public class Client {
         this.currentTopic = topic;
         this.dhtNode = dhtNode;
         this.aggregationServerId = aggregationServerId;
+        this.aggregationCount = 0;
 
         this.context = context;
 
@@ -80,6 +83,18 @@ public class Client {
 
     public void setCurrentTopic(String currentTopic) {
         this.currentTopic = currentTopic;
+    }
+
+    public void setCurrentChatServer(int nextServer) {
+        this.currentChatServer = nextServer;
+    }
+
+    public int getAggregationCount() {
+        return aggregationCount;
+    }
+
+    public void incrementAggregationCount() {
+        this.aggregationCount++;
     }
 
     public void run() throws IOException {
@@ -112,14 +127,7 @@ public class Client {
         this.currentChatServer = chosenChatServer;
         
         console.info("Setting up connections to chosen chat server...");
-        this.setupConnectionsToChatServer();
-
-        console.info("Announcing to chat server...");
-        int status = this.maybeAnnounceToServer();
-        if (status == -1) {
-            this.stop();
-            return;
-        }
+        this.setupConnectionsToChatServer(); 
         
         Thread cliThread = new Thread(() -> this.runCli(), "Cli-Thread");
         Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
@@ -142,6 +150,12 @@ public class Client {
         this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
         this.commandManager.registerCommand(new OnlineUsersCommand(this, this.chatServerReqEndpoint));
         this.commandManager.registerCommand(new LogsCommand(this, this.reactiveClient));
+        this.commandManager.registerCommand(new TopicCommand(
+            this, 
+            this.pushEndpoint,
+            this.aggregationServerReqEndpoint,
+            this.dhtClient
+        ));
         
         HelpCommand helpCommand = new HelpCommand(this.commandManager);
         this.commandManager.registerCommand(helpCommand);
@@ -166,9 +180,6 @@ public class Client {
 
     private void runSubscriber() {
         this.subEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this, this.console));
-
-        this.subEndpoint.subscribe(this.currentTopic);
-        console.info("You are now subscribed to topic " + "'" + this.currentTopic + "'");
         
         while (this.running) {
             try {
@@ -207,8 +218,11 @@ public class Client {
     }
 
     private int startAggregation() {
+        String dotClientId = this.id + "-" + this.aggregationCount;
+        this.incrementAggregationCount();
+
         AggregationStartMessage startAggregationMessage = AggregationStartMessage.newBuilder()
-                .setClientId(this.id)
+                .setDotClientId(dotClientId)
                 .setTopic(this.currentTopic)
                 .build();
 
@@ -237,11 +251,12 @@ public class Client {
         }
     }
 
-    private void setupConnectionsToChatServer() {
+    public void setupConnectionsToChatServer() {
         int pullPort = this.currentChatServer;
         this.pushEndpoint = new PushEndpoint(this.context);
+        this.pushEndpoint.setLinger(2000);
         pushEndpoint.connectSocket("localhost", pullPort);
-        console.debug("[PULL] Connected on port " + pullPort);
+        console.debug("[PUSH] Connected on port " + pullPort);
         
         int repPort = this.currentChatServer + 1;
         this.chatServerReqEndpoint = new ReqEndpoint(this.context);
@@ -253,10 +268,53 @@ public class Client {
         subEndpoint.connectSocket("localhost", pubPort);
         console.debug("[SUB] Connected on port " + pubPort);
 
+        subEndpoint.subscribe(this.currentTopic);
+        console.info("You are now subscribed to topic '" + this.currentTopic + "'");
+
         int reactivePort = this.currentChatServer + 4;
         this.reactiveClient = new ReactiveGrpcClient(console);
         reactiveClient.setup("localhost", reactivePort);
         console.debug("[REACTIVE] Connected on port " + reactivePort);
+
+        console.info("Announcing to chat server...");
+        int status = this.maybeAnnounceToServer();
+        if (status == -1) {
+            this.stop();
+            return;
+        }
+    }
+
+    public void resetConnectionsToChatServer() {
+        int pullPort = this.currentChatServer;
+        this.pushEndpoint.disconnectSocket();
+        pushEndpoint.connectSocket("localhost", pullPort);
+        pushEndpoint.setLinger(2000);
+        console.debug("[PUSH] Connected on port " + pullPort);
+
+        int repPort = this.currentChatServer + 1;
+        this.chatServerReqEndpoint.disconnectSocket();
+        chatServerReqEndpoint.connectSocket("localhost", repPort);
+        console.debug("[REQ | Chat server] Connected on port " + repPort);
+
+        int pubPort = this.currentChatServer + 2;
+        this.subEndpoint.disconnectSocket();
+        subEndpoint.connectSocket("localhost", pubPort);
+        console.debug("[SUB] Connected on port " + pubPort);
+
+        subEndpoint.subscribe(this.currentTopic);
+        console.info("You are now subscribed to topic '" + this.currentTopic + "'");
+
+        int reactivePort = this.currentChatServer + 4;
+        this.reactiveClient.close();
+        reactiveClient.setup("localhost", reactivePort);
+        console.debug("[REACTIVE] Connected on port " + reactivePort);
+
+        console.info("Announcing to chat server...");
+        int status = this.maybeAnnounceToServer();
+        if (status == -1) {
+            this.stop();
+            return;
+        }
     }
 
     private int maybeAnnounceToServer() {
@@ -290,11 +348,13 @@ public class Client {
 
     public void stop() {
         this.running = false;
-
+        
+        if (this.dhtClient != null) this.dhtClient.close();
         if (this.pushEndpoint != null) this.pushEndpoint.close();
         if (this.chatServerReqEndpoint != null) this.chatServerReqEndpoint.close();
-        if (this.aggregationServerReqEndpoint != null) this.aggregationServerReqEndpoint.close();
         if (this.subEndpoint != null) this.subEndpoint.close();
+        if (this.reactiveClient != null) this.reactiveClient.close();
+        if (this.aggregationServerReqEndpoint != null) this.aggregationServerReqEndpoint.close();
 
         try {
             this.console.close();
