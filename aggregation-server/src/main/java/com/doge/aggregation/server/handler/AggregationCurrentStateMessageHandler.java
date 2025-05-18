@@ -3,33 +3,45 @@ package com.doge.aggregation.server.handler;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.zeromq.ZContext;
+
 import com.doge.aggregation.server.gossip.ChatServerState;
 import com.doge.aggregation.server.gossip.GossipManager;
+import com.doge.aggregation.server.socket.tcp.DhtClient;
 import com.doge.common.Logger;
+import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.AggregationCurrentStateMessage;
 import com.doge.common.proto.AggregationResultMessage;
 import com.doge.common.proto.ChatServerStateMessage;
 import com.doge.common.proto.GetChatServerStateMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.proto.NotifyNewTopicAckMessage;
+import com.doge.common.proto.NotifyNewTopicMessage;
 import com.doge.common.socket.MessageHandler;
 import com.doge.common.socket.zmq.RepEndpoint;
 import com.doge.common.socket.zmq.ReqEndpoint;
 
 public class AggregationCurrentStateMessageHandler implements MessageHandler<MessageWrapper> {
+    private ZContext context;
     private RepEndpoint repEndpoint;
     private ReqEndpoint reqEndpoint;
+    private DhtClient dhtClient;
 
     private GossipManager gossipManager;
     private Logger logger;
 
     public AggregationCurrentStateMessageHandler(
+        ZContext context,
         RepEndpoint repEndpoint,
         ReqEndpoint reqEndpoint,
+        DhtClient dhtClient,
         GossipManager gossipManager,
         Logger logger
     ) {
+        this.context = context;
         this.repEndpoint = repEndpoint;
         this.reqEndpoint = reqEndpoint;
+        this.dhtClient = dhtClient;
 
         this.gossipManager = gossipManager;
         this.logger = logger;
@@ -73,7 +85,8 @@ public class AggregationCurrentStateMessageHandler implements MessageHandler<Mes
             gossipManager.finishAggregation(aggregationId);
 
             if (gossipManager.wasStartedByUs(aggregationId)) {
-                this.notifyInterestedParties(aggregationId, topic);
+                List<ChatServerState> chosen = gossipManager.getBestChatServers(aggregationId);
+                this.notifyInterestedParties(aggregationId, topic, chosen);
             }
         } else {
             gossipManager.doGossipStep(aggregationId);
@@ -108,15 +121,59 @@ public class AggregationCurrentStateMessageHandler implements MessageHandler<Mes
         }
     }
 
-    private void notifyInterestedParties(String aggregationId, String topic) {
-        logger.info("Aggregation '" + aggregationId + "' was started by us. Sending result to DHT and client...");
+    private void notifyInterestedParties(
+        String aggregationId, 
+        String topic,
+        List<ChatServerState> chosen
+    ) {
+        logger.info("Aggregation '" + aggregationId + "' was started by us. Notifying interested parties...");
+        
+        // Chosen chat servers
+        List<Integer> chatServerIds = chosen.stream()
+            .map(ChatServerState::id)
+            .toList();
 
-        // TODO: Send to DHT
+        for (ChatServerState chatServer : chosen) {
+            List<Integer> otherChatServers = new ArrayList<>(chatServerIds);
+            int selfId = chatServer.id();
+
+            otherChatServers.removeIf(id -> id == selfId);
+            this.notifyChatServer(selfId, topic, otherChatServers);
+        }
+
+        // Notify DHT
+        dhtClient.create(topic, chatServerIds);
 
         // Client
         List<ChatServerState> result = gossipManager.getBestChatServers(aggregationId);
         MessageWrapper response = createAggregationResultMessage(topic, result);
         repEndpoint.send(response);
+        logger.info("Notified client about aggregation result for topic '" + topic + "'");
+    }
+
+    private void notifyChatServer(
+        int chatServerId,
+        String topic,
+        List<Integer> otherChatServers
+    ) {
+        MessageWrapper message = createNotifyNewTopicMessage(topic, otherChatServers);
+        ReqEndpoint reqEndpoint = new ReqEndpoint(context);
+        reqEndpoint.setLinger(2000);
+
+        int repPort = chatServerId + 1;
+        reqEndpoint.connectSocket("localhost", repPort);
+
+        reqEndpoint.send(message);
+        logger.info("Notified chat server " + chatServerId + " about new topic '" + topic + "'");
+
+        try {
+            MessageWrapper response = reqEndpoint.receiveOnceWithoutHandle();
+            NotifyNewTopicAckMessage ack = response.getNotifyNewTopicAckMessage();
+
+            logger.info("Received acknowledgment from chat server " + chatServerId + " for topic '" + ack.getTopic() + "'");
+        } catch (InvalidFormatException ignored) {}
+
+        reqEndpoint.close();
     }
 
     private MessageWrapper createGetChatServerStateMessage() {
@@ -153,6 +210,17 @@ public class AggregationCurrentStateMessageHandler implements MessageHandler<Mes
 
         return MessageWrapper.newBuilder()
             .setAggregationResultMessage(message)
+            .build();
+    }
+
+    private MessageWrapper createNotifyNewTopicMessage(String topic, List<Integer> otherChatServers) {
+        NotifyNewTopicMessage message = NotifyNewTopicMessage.newBuilder()
+            .setTopic(topic)
+            .addAllOtherServerIds(otherChatServers)
+            .build();
+
+        return MessageWrapper.newBuilder()
+            .setNotifyNewTopicMessage(message)
             .build();
     }
 }

@@ -8,6 +8,7 @@ import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.handler.ShuffleMessageHandler;
 import com.doge.aggregation.server.neighbour.NeighbourManager;
+import com.doge.aggregation.server.socket.tcp.DhtClient;
 import com.doge.aggregation.server.gossip.GossipManager;
 import com.doge.aggregation.server.handler.AggregationCurrentStateMessageHandler;
 import com.doge.aggregation.server.handler.AggregationStartMessageHandler;
@@ -28,6 +29,7 @@ public class AggregationServer {
     private PullEndpoint pullEndpoint;
     private RepEndpoint repEndpoint;
     private ReqEndpoint reqEndpoint;
+    private DhtClient dhtClient;
 
     private NeighbourManager neighbourManager;
     private GossipManager gossipManager;
@@ -42,6 +44,7 @@ public class AggregationServer {
         PullEndpoint pullEndpoint,
         RepEndpoint repEndpoint,
         ReqEndpoint reqEndpoint,
+        DhtClient dhtClient,
         NeighbourManager neighbourManager,
         Logger logger
     ) {
@@ -53,6 +56,7 @@ public class AggregationServer {
         this.pullEndpoint = pullEndpoint;
         this.repEndpoint = repEndpoint;
         this.reqEndpoint = reqEndpoint;
+        this.dhtClient = dhtClient;
 
         this.neighbourManager = neighbourManager;
         this.logger = logger;
@@ -94,8 +98,10 @@ public class AggregationServer {
 
         this.pullEndpoint.on(MessageTypeCase.SHUFFLEMESSAGE, shuffleMessageHandler);
         this.pullEndpoint.on(MessageTypeCase.AGGREGATIONCURRENTSTATEMESSAGE, new AggregationCurrentStateMessageHandler(
+            this.context,
             this.repEndpoint,
             this.reqEndpoint,
+            this.dhtClient,
             this.gossipManager,
             this.logger
         ));
