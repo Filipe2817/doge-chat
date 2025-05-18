@@ -41,6 +41,19 @@ public class NeighbourManager {
         return neighbours.get(0);
     }
 
+    public List<Neighbour> getAll() {
+        return new ArrayList<>(cache.values());
+    }
+
+    public Neighbour getRandom() {
+        List<Neighbour> neighbours = new ArrayList<>(cache.values());
+        if (neighbours.isEmpty()) {
+            return null;
+        }
+        Collections.shuffle(neighbours, this.random);
+        return neighbours.get(0);
+    }
+
     public Neighbour addNeighbour(Neighbour n) {
         Neighbour removed = null;
         if (cache.size() >= cacheSize) {
@@ -71,6 +84,10 @@ public class NeighbourManager {
 
     public int size() {
         return cache.size();
+    }
+
+    public int cacheSize() {
+        return cacheSize;
     }
 
     public boolean isFull() {

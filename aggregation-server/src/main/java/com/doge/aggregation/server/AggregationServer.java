@@ -12,6 +12,7 @@ import com.doge.aggregation.server.cyclon.CyclonManager;
 import com.doge.aggregation.server.gossip.GossipManager;
 import com.doge.aggregation.server.handler.AggregationCurrentStateMessageHandler;
 import com.doge.aggregation.server.handler.AggregationStartMessageHandler;
+import com.doge.aggregation.server.handler.RandomWalkMessageHandler;
 import com.doge.common.Logger;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
@@ -98,7 +99,13 @@ public class AggregationServer {
             this.logger
         );
 
+        RandomWalkMessageHandler randomWalkMessageHandler = new RandomWalkMessageHandler(
+            cyclonManager,
+            this.logger
+        );
+
         this.pullEndpoint.on(MessageTypeCase.SHUFFLEMESSAGE, shuffleMessageHandler);
+        this.pullEndpoint.on(MessageTypeCase.RANDOMWALKMESSAGE, randomWalkMessageHandler);
         this.pullEndpoint.on(MessageTypeCase.AGGREGATIONCURRENTSTATEMESSAGE, new AggregationCurrentStateMessageHandler(
             this.repEndpoint,
             this.reqEndpoint,
@@ -109,7 +116,7 @@ public class AggregationServer {
         // Schedule periodic shuffle trigger every 10 seconds
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                cyclonManager.triggerShuffle();
+                cyclonManager.trigger();
             } catch(Exception e) {
                 logger.error("Error triggering shuffle: " + e.getMessage());
             }
@@ -118,6 +125,8 @@ public class AggregationServer {
         while (this.running) {
             try {
                 this.pullEndpoint.receiveOnce();
+                logger.info("Neigbours cache");
+                logger.info(neighbourManager.toString());
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;
