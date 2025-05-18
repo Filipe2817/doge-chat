@@ -129,18 +129,18 @@ public class Client {
         console.info("Setting up connections to chosen chat server...");
         this.setupConnectionsToChatServer(); 
         
-        Thread cliThread = new Thread(() -> this.runCli(), "Cli-Thread");
-        Thread subscriberThread = new Thread(() -> this.runSubscriber(), "Subscriber-Thread");
+        Thread cliThread = new Thread(this::runCli, "Cli-Thread");
+        Thread subThread = new Thread(this::runSub, "Subscriber-Thread");
 
         try {
             cliThread.start(); 
-            subscriberThread.start();
+            subThread.start();
 
             cliThread.join(); 
-            subscriberThread.join();
+            subThread.join();
         } catch (InterruptedException e) {
             cliThread.interrupt();
-            subscriberThread.interrupt();
+            subThread.interrupt();
             this.stop();
         } 
     } 
@@ -178,7 +178,7 @@ public class Client {
         }
     }
 
-    private void runSubscriber() {
+    private void runSub() {
         this.subEndpoint.on(MessageTypeCase.CHATMESSAGE, new ChatMessageHandler(this, this.console));
         
         while (this.running) {
