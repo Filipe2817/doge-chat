@@ -7,18 +7,19 @@ import com.doge.chat.server.handler.ChatMessageHandler;
 import com.doge.chat.server.handler.ExitMessageHandler;
 import com.doge.chat.server.handler.ForwardChatMessageHandler;
 import com.doge.chat.server.handler.ForwardUserOnlineMessageHandler;
+import com.doge.chat.server.handler.GetChatServerStateMessageHandler;
 import com.doge.chat.server.handler.GetOnlineUsersMessageHandler;
 import com.doge.chat.server.log.LogManager;
 import com.doge.chat.server.socket.reactive.ReactiveGrpcEndpoint;
-import com.doge.chat.server.socket.zmq.PubEndpoint;
-import com.doge.chat.server.socket.zmq.PullEndpoint;
-import com.doge.chat.server.socket.zmq.RepEndpoint;
-import com.doge.chat.server.socket.zmq.SubEndpoint;
 import com.doge.chat.server.user.UserManager;
 import com.doge.common.Logger;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
+import com.doge.common.socket.zmq.PubEndpoint;
+import com.doge.common.socket.zmq.PullEndpoint;
+import com.doge.common.socket.zmq.RepEndpoint;
+import com.doge.common.socket.zmq.SubEndpoint;
 
 public class ChatServer {
     private volatile boolean running;
@@ -152,6 +153,13 @@ public class ChatServer {
             this.userManager
         ));
 
+        this.repEndpoint.on(MessageTypeCase.GETCHATSERVERSTATEMESSAGE, new GetChatServerStateMessageHandler(
+            this,
+            this.logger,
+            this.repEndpoint,
+            this.userManager
+        ));
+
         while (this.running) {
             try {
                 this.repEndpoint.receiveOnce();
@@ -201,6 +209,7 @@ public class ChatServer {
         this.running = false;
 
         this.pullEndpoint.close();
+        this.repEndpoint.close();
         this.subEndpoint.close();
         this.clientPubEndpoint.close();
         this.chatServerPubEndpoint.close();

@@ -1,13 +1,12 @@
 package com.doge.aggregation.server.handler;
 
-import com.doge.aggregation.server.socket.zmq.PushEndpoint;
 import com.doge.aggregation.server.AggregationServer;
-import com.doge.aggregation.server.neighbours.Neighbour;
-import com.doge.aggregation.server.neighbours.NeighbourManager;
+import com.doge.aggregation.server.neighbour.Neighbour;
+import com.doge.aggregation.server.neighbour.NeighbourManager;
 import com.doge.common.Logger;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.MessageHandler;
-
+import com.doge.common.socket.zmq.PushEndpoint;
 import com.doge.common.proto.ShuffleMessage;
 import com.doge.common.proto.ShuffleMessageType;
 import com.doge.common.proto.PeerEntry;
@@ -69,7 +68,7 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             sender.sendMessage(busyMessage);
             sender.disconnect();
             
-            logger.warn("Shuffle already in progress, ignoring new shuffle message.");
+            logger.warn("Shuffle already in progress. Ignoring new shuffle message...");
             return;
         }
 
@@ -141,6 +140,9 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             try {
                 sender.sendMessage(shuffleResponse);
                 logger.info("Sent shuffle response to neighbour '" + senderId + "'");
+
+                logger.info("Neigbours cache");
+                logger.info(neighbourManager.toString());
             } catch (Exception e) {
                 logger.error("Failed to send shuffle response, neighbour may be unreachable: " + e.getMessage());
             }
@@ -229,6 +231,7 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
         for (Neighbour neighbour : peerEntries) {
             // Reset age for self
             int age = neighbour.getId().equals(senderId) ? 0 : neighbour.getAge();
+
             PeerEntry peerEntry = PeerEntry.newBuilder()
                 .setId(neighbour.getId())
                 .setAge(age)

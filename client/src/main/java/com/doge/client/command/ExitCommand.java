@@ -2,9 +2,9 @@ package com.doge.client.command;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
-import com.doge.client.socket.zmq.PushEndpoint;
 import com.doge.common.proto.ExitMessage;
 import com.doge.common.proto.MessageWrapper;
+import com.doge.common.socket.zmq.PushEndpoint;
 
 public class ExitCommand extends AbstractCommand {
     private final Client client;

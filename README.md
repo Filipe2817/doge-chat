@@ -6,6 +6,8 @@
 
 ## 🏃 Running
 
+### ☕️ Java
+
 First, make sure you have the required dependencies installed.
 
 ```bash
@@ -21,7 +23,7 @@ mvn -pl client exec:java
 You can pass arguments to the client using the `-Dexec.args` option. For example, to make the client connect to a specific chat server, you can run:
 
 ```bash
-mvn -pl client exec:java -Dexec.args="--name rui --topic <topic> --dht localhost:7000"
+mvn -pl client exec:java -Dexec.args="--name rui --topic uminho -as 6667"
 
 You can list the available options for the client by running:
 
@@ -35,7 +37,7 @@ mvn -pl client exec:java -Dexec.args="--help"
 Running a chat server:
 
 ```bash
-mvn -pl chat-server exec:java -Dexec.args="--subscriber-ports 5558,6558" # you can also use -sub
+mvn -pl chat-server exec:java -Dexec.args="--subscriber-ports 5558,6558" # can also use -sub
 ```
 
 Note that these are the ports that the SUB socket will connect to, which should have PUB sockets bound to them.
@@ -49,7 +51,23 @@ mvn -pl chat-server exec:java -Dexec.args="--help"
 > [!NOTE]
 > Make sure you understand the role of the `-p` flag, since it is crucial for the server workflow. For example, if `-p` is set to `5555`, the server will bind a PULL socket to it. Subsequent port numbers will be used for PUB sockets.
 
-## 💡 Tips
+#### 💡 Tips
 
 - Run `mvn compile` whenever a new Protobuf file is added or modified. This will generate the necessary Java classes for the Protobuf messages.
 - Run `mvn install` whenever a new dependency has been added or modified. This will update the local Maven repository with the new dependencies.
+
+### 🔴 Erlang
+
+Running a DHT node (from inside the `search-node` directory):
+
+```bash
+sh scripts/launch_node.sh n1 # currently, we support nodes from 1 to 5
+```
+
+Running a simulated client:
+
+```bash
+python scripts/client_simulation.py
+```
+
+This will run a simulated client that will connect to the DHT node and send messages to it. The client will also receive messages from the DHT node and print them to the console.
