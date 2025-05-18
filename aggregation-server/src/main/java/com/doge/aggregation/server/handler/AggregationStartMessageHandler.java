@@ -30,12 +30,12 @@ public class AggregationStartMessageHandler implements MessageHandler<MessageWra
     @Override
     public void handle(MessageWrapper wrapper) {
         AggregationStartMessage message = wrapper.getAggregationStartMessage();
-        String clientId = message.getClientId();
+        String dotClientId = message.getDotClientId();
         String topic = message.getTopic();
 
-        logger.info("Received start aggregation request from '" + clientId + "' on topic '" + topic + "'");
+        logger.info("Received start aggregation request with dot id '" + dotClientId + "' on topic '" + topic + "'");
 
-        String aggregationId = clientId;
+        String aggregationId = dotClientId;
         try {
             ChatServerState self = fetchSelfState();
             gossipManager.startAggregation(aggregationId, topic, self);

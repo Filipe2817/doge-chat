@@ -1,4 +1,4 @@
-package com.doge.client.socket.tcp;
+package com.doge.common.socket.tcp;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

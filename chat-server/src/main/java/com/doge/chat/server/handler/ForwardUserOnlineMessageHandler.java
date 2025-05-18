@@ -25,10 +25,10 @@ public class ForwardUserOnlineMessageHandler implements MessageHandler<MessageWr
 
     @Override
     public void handle(MessageWrapper wrapper) {
-        logger.info("Started handling ForwardUserOnlineMessage");
-
         ForwardUserOnlineMessage message = wrapper.getForwardUserOnlineMessage();
         String topic = message.getTopic();
+
+        logger.debug("Started handling ForwardUserOnlineMessage for topic '" + topic + "'");
 
         DotStore incomingDotStore = new DotStore();
         message.getDotStoreMap().forEach((key, dotSetMessage) -> {
@@ -44,6 +44,6 @@ public class ForwardUserOnlineMessageHandler implements MessageHandler<MessageWr
 
         userManager.updateDotStoreForTopic(topic, incomingState);
 
-        logger.info("Finished handling ForwardUserOnlineMessage for topic: " + topic);
+        logger.debug("Finished handling ForwardUserOnlineMessage for topic '" + topic + "'");
     }
 }

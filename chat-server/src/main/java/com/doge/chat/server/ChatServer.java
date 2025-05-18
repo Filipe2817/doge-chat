@@ -9,6 +9,7 @@ import com.doge.chat.server.handler.ForwardChatMessageHandler;
 import com.doge.chat.server.handler.ForwardUserOnlineMessageHandler;
 import com.doge.chat.server.handler.GetChatServerStateMessageHandler;
 import com.doge.chat.server.handler.GetOnlineUsersMessageHandler;
+import com.doge.chat.server.handler.NotifyNewTopicMessageHandler;
 import com.doge.chat.server.log.LogManager;
 import com.doge.chat.server.socket.reactive.ReactiveGrpcEndpoint;
 import com.doge.chat.server.user.UserManager;
@@ -24,7 +25,7 @@ import com.doge.common.socket.zmq.SubEndpoint;
 public class ChatServer {
     private volatile boolean running;
     private final int id;
-    private final String topic;
+    private int topicsBeingServed;
 
     private PullEndpoint pullEndpoint;
     private SubEndpoint subEndpoint;
@@ -42,7 +43,6 @@ public class ChatServer {
 
     public ChatServer(
         int id,
-        String topic,
         PullEndpoint pullEndpoint,
         SubEndpoint subEndpoint,
         RepEndpoint repEndpoint,
@@ -56,7 +56,7 @@ public class ChatServer {
     ) {
         this.running = false;
         this.id = id;
-        this.topic = topic;
+        this.topicsBeingServed = 0;
 
         this.pullEndpoint = pullEndpoint;
         this.repEndpoint = repEndpoint;
@@ -80,6 +80,14 @@ public class ChatServer {
 
     public int getId() {
         return id;
+    }
+
+    public int getTopicsBeingServed() {
+        return topicsBeingServed;
+    }
+
+    public void incrementTopicsBeingServed() {
+        this.topicsBeingServed++;
     }
 
     public void run() {
@@ -124,7 +132,7 @@ public class ChatServer {
             this.logger, 
             this.chatServerPubEndpoint, 
             this.userManager
-        ));
+        )); 
 
         while (this.running) {
             try {
@@ -155,8 +163,16 @@ public class ChatServer {
 
         this.repEndpoint.on(MessageTypeCase.GETCHATSERVERSTATEMESSAGE, new GetChatServerStateMessageHandler(
             this,
+            this.repEndpoint,
+            this.userManager
+        ));
+
+        this.repEndpoint.on(MessageTypeCase.NOTIFYNEWTOPICMESSAGE, new NotifyNewTopicMessageHandler(
+            this,
             this.logger,
             this.repEndpoint,
+            this.subEndpoint,
+            this.vectorClockManager,
             this.userManager
         ));
 
@@ -176,9 +192,6 @@ public class ChatServer {
     private void runSub() {
         this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.logger, this.causalDeliveryManager));
         this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(this.logger, this.userManager));
-
-        this.subEndpoint.subscribe(this.topic);
-        logger.info("Chat server is now part of topic " + "'" + this.topic + "'");
 
         while (this.running) {
             try {
