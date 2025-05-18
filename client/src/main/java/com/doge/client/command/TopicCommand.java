@@ -21,6 +21,8 @@ public class TopicCommand extends AbstractCommand {
     private ReqEndpoint aggregationServerReqEndpoint;
     private DhtClient dhtClient;
 
+    private static final Random RANDOM = new Random();
+
     public TopicCommand(
         Client client,
         PushEndpoint pushEndpoint,
@@ -77,8 +79,7 @@ public class TopicCommand extends AbstractCommand {
             }
 
             // Randomly select a chat server from the list
-            Random random = new Random();
-            int randomIndex = random.nextInt(chatServers.size());
+            int randomIndex = RANDOM.nextInt(chatServers.size());
             int chosenChatServer = chatServers.get(randomIndex);
 
             console.info("Found chat server with id '" + chosenChatServer + "' for topic '" + topic + "'");
@@ -116,8 +117,7 @@ public class TopicCommand extends AbstractCommand {
             console.warn("Got response from aggregation server. Found C chat servers: " + chatServers);
 
             // Randomly select a chat server from the list
-            Random random = new Random();
-            int randomIndex = random.nextInt(chatServers.size());
+            int randomIndex = RANDOM.nextInt(chatServers.size());
             int chosenChatServer = chatServers.get(randomIndex);
 
             console.info("Chose chat server with id '" + chosenChatServer + "' for topic '" + topic + "'");
