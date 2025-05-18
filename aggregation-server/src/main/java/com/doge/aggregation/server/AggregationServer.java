@@ -8,6 +8,7 @@ import org.zeromq.ZContext;
 
 import com.doge.aggregation.server.handler.ShuffleMessageHandler;
 import com.doge.aggregation.server.neighbour.NeighbourManager;
+import com.doge.aggregation.server.cyclon.CyclonManager;
 import com.doge.aggregation.server.gossip.GossipManager;
 import com.doge.aggregation.server.handler.AggregationCurrentStateMessageHandler;
 import com.doge.aggregation.server.handler.AggregationStartMessageHandler;
@@ -84,11 +85,16 @@ public class AggregationServer {
     }
 
     private void runPull() {
-        ShuffleMessageHandler shuffleMessageHandler = new ShuffleMessageHandler(
+        CyclonManager cyclonManager = new CyclonManager(
             this.l,
             this,
             this.context,
             this.neighbourManager,
+            this.logger
+        );
+
+        ShuffleMessageHandler shuffleMessageHandler = new ShuffleMessageHandler(
+            cyclonManager,
             this.logger
         );
 
@@ -103,7 +109,7 @@ public class AggregationServer {
         // Schedule periodic shuffle trigger every 10 seconds
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                shuffleMessageHandler.triggerShuffle();
+                cyclonManager.triggerShuffle();
             } catch(Exception e) {
                 logger.error("Error triggering shuffle: " + e.getMessage());
             }
