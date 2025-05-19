@@ -3,7 +3,10 @@ package com.doge.chat.server;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
@@ -25,6 +28,7 @@ import com.doge.chat.server.user.UserManager;
 import com.doge.common.Logger;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
+import com.doge.common.proto.MessageWrapper;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
 import com.doge.common.socket.zmq.PubEndpoint;
 import com.doge.common.socket.zmq.PullEndpoint;
@@ -46,8 +50,11 @@ public class ChatServer {
     private List<RepEndpoint> workerSockets;
 
     private PubEndpoint clientPubEndpoint;
-    private PubEndpoint chatServerPubEndpoint;
     private ReactiveGrpcEndpoint reactiveEndpoint;
+
+    private PubEndpoint chatServerPubEndpoint;
+    // Pair of topic and message
+    private BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue;
 
     private VectorClockManager vectorClockManager;
     private LogManager logManager;
@@ -63,8 +70,8 @@ public class ChatServer {
         SubEndpoint subEndpoint,
         int repPort,
         PubEndpoint clientPubEndpoint,
-        PubEndpoint chatServerPubEndpoint,
         ReactiveGrpcEndpoint reactiveEndpoint,
+        PubEndpoint chatServerPubEndpoint,
         LogManager logManager,
         VectorClockManager vectorClockManager,
         UserManager userManager,
@@ -82,8 +89,10 @@ public class ChatServer {
         this.workerSockets = Collections.synchronizedList(new ArrayList<>());
 
         this.clientPubEndpoint = clientPubEndpoint;
-        this.chatServerPubEndpoint = chatServerPubEndpoint;
         this.reactiveEndpoint = reactiveEndpoint;
+
+        this.chatServerPubEndpoint = chatServerPubEndpoint;
+        this.chatServerPubQueue = new LinkedBlockingQueue<>();
 
         this.logManager = logManager;
         this.vectorClockManager = vectorClockManager;
@@ -116,8 +125,9 @@ public class ChatServer {
         Thread pullThread = new Thread(this::runPull, "Pull-Thread");
         Thread subThread = new Thread(this::runSub, "Sub-Thread");
         Thread reactiveThread = new Thread(this::runReactive, "Reactive-Thread");
-        Thread proxyThread = new Thread(this::runRepProxy, "Rep-Proxy-Thread");
+        Thread chatServerPubThread = new Thread(this::runChatServerPub, "Chat-Server-Pub-Thread");
 
+        Thread proxyThread = new Thread(this::runRepProxy, "Rep-Proxy-Thread");
         int workerCount = Runtime.getRuntime().availableProcessors();
         List<Thread> workerThreads = new ArrayList<>();
         for (int i = 0; i < workerCount; i++) {
@@ -128,6 +138,7 @@ public class ChatServer {
         pullThread.start();
         subThread.start();
         reactiveThread.start();
+        chatServerPubThread.start();
 
         proxyThread.start();
         workerThreads.forEach(Thread::start);
@@ -137,12 +148,16 @@ public class ChatServer {
             pullThread.join();
             subThread.join();
             reactiveThread.join();
+            chatServerPubThread.join();
+
             proxyThread.join();
             for (Thread wt : workerThreads) wt.join();
         } catch (InterruptedException e) {
             pullThread.interrupt();
             subThread.interrupt();
             reactiveThread.interrupt();
+            chatServerPubThread.interrupt();
+
             proxyThread.interrupt();
             workerThreads.forEach(Thread::interrupt);
         } finally {
@@ -155,14 +170,14 @@ public class ChatServer {
             this,
             this.logger,
             this.clientPubEndpoint,
-            this.chatServerPubEndpoint,
+            this.chatServerPubQueue,
             this.vectorClockManager,
             this.logManager
         ));
 
         this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(
-            this.logger, 
-            this.chatServerPubEndpoint, 
+            this.logger,
+            this.chatServerPubQueue,
             this.userManager
         )); 
 
@@ -180,8 +195,15 @@ public class ChatServer {
     } 
 
     private void runSub() {
-        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.logger, this.causalDeliveryManager));
-        this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(this.logger, this.userManager));
+        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(
+            this.logger, 
+            this.causalDeliveryManager
+        ));
+
+        this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(
+            this.logger, 
+            this.userManager
+        ));
 
         while (this.running) {
             try {
@@ -203,6 +225,26 @@ public class ChatServer {
                 reactiveEndpoint.runServer();
             } catch (Exception e) {
                 logger.error("[REACTIVE] Error while running: " + e.getMessage());
+                break;
+            }
+        }
+    }
+
+    private void runChatServerPub() {
+        while (this.running) {
+            try {
+                logger.info("[CHAT-SERVER-PUB] Started dequeuing messages");
+
+                Pair<String, MessageWrapper> message = this.chatServerPubQueue.take();
+                String topic = message.getLeft();
+                MessageWrapper wrapper = message.getRight();
+
+                this.chatServerPubEndpoint.send(topic, wrapper);
+            } catch (InterruptedException e) {
+                logger.error("[CHAT-SERVER-PUB] Interruped while dequeuing messages: " + e.getMessage());
+                break;
+            } catch (Exception e) {
+                logger.error("[CHAT-SERVER-PUB] Error while dequeuing messages: " + e.getMessage());
                 break;
             }
         }
@@ -231,7 +273,7 @@ public class ChatServer {
         
         worker.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
             this.logger,
-            this.chatServerPubEndpoint,
+            this.chatServerPubQueue,
             worker,
             this.userManager
         ));
