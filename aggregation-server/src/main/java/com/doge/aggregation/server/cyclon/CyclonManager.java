@@ -4,10 +4,8 @@ import com.doge.aggregation.server.AggregationServer;
 import com.doge.aggregation.server.neighbour.Neighbour;
 import com.doge.aggregation.server.neighbour.NeighbourManager;
 import com.doge.common.Logger;
-import com.doge.common.proto.Message;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.zmq.PushEndpoint;
-import com.google.rpc.context.AttributeContext.Peer;
 import com.doge.common.proto.ShuffleMessage;
 import com.doge.common.proto.ShuffleMessageType;
 import com.doge.common.proto.PeerEntry;
@@ -29,8 +27,6 @@ public class CyclonManager {
     private final Logger logger;
 
     private List<Neighbour> candidates;
-    private boolean shuffleInProgress;
-    private boolean initialShuffleDone;
 
     public CyclonManager(
         Integer l,
@@ -48,20 +44,9 @@ public class CyclonManager {
         this.logger = logger;
 
         this.candidates = List.of();
-        this.shuffleInProgress = false;
-        this.initialShuffleDone = false;
-    }
-
-    public void setShuffleInProgress(boolean shuffleInProgress) {
-        this.shuffleInProgress = shuffleInProgress;
     }
 
     public void handleShuffleRequest(Integer senderId, List<PeerEntry> peerEntries) {
-        if (shuffleInProgress) {
-            handleBusyShuffle(senderId);
-            return;
-        }
-
         List<Neighbour> randomCandidates = neighbourManager.pickRandom(l, null);
 
         // Use an index pointer for removal to avoid out-of-bound errors
@@ -126,11 +111,6 @@ public class CyclonManager {
     }
 
     public void handleShuffleResponse(Integer senderId, List<PeerEntry> peerEntries) {
-        if (shuffleInProgress) {
-            handleBusyShuffle(senderId);
-            return;
-        }
-
         // Separate index for candidates to remove
         int removalCandidateIndex = 0;
         for (int i = 0; i < peerEntries.size(); i++) {
@@ -164,15 +144,9 @@ public class CyclonManager {
         }
 
         this.candidates = List.of();
-        this.shuffleInProgress = false;
     }
 
     public void handleRandomWalkRequest(Integer senderId, int ttl) {
-        if (shuffleInProgress) {
-            handleBusyShuffle(senderId);
-            return;
-        }
-
         List<Neighbour> neighbours = neighbourManager.getAll();
 
         if (neighbours.isEmpty()) {
@@ -198,11 +172,6 @@ public class CyclonManager {
     }
 
     public void handleRandomWalkIntro(Integer senderId, int ttl) {
-        if (shuffleInProgress) {
-            handleBusyShuffle(senderId);
-            return;
-        }
-
         if (ttl > 0 && neighbourManager.size() > 0) {
             Neighbour next = neighbourManager.getRandom();
             if (next != null) {
@@ -274,34 +243,20 @@ public class CyclonManager {
             this.candidates = new ArrayList<>();
         } catch (Exception e) {
             logger.error("Failed to handle random walk response: " + e.getMessage());
-        } finally {
-            this.shuffleInProgress = false;
-            this.initialShuffleDone = true;
         }
     }
 
-    public void trigger() {
-        if (!initialShuffleDone) {
-            triggerIntroRandomWalk();
-        } else {
-            triggerShuffle();
-        }
-    }
-
-    private void triggerShuffle() {
+    public void triggerShuffle() {
         try {
-            this.shuffleInProgress = true;
             neighbourManager.ageAll();
 
             if (neighbourManager.size() == 0) {
-                this.shuffleInProgress = false;
                 logger.info("Not enough neighbours available to perform shuffle");
                 return;
             }
 
             Neighbour oldest = neighbourManager.getOldest();
             if (oldest == null) {
-                this.shuffleInProgress = false;
                 logger.error("No oldest neighbour found");
                 return;
             }
@@ -317,19 +272,15 @@ public class CyclonManager {
 
             MessageWrapper shuffleMessage = createShuffleMessage(aggregationServer.getId(), candidatesToSend, ShuffleMessageType.SHUFFLE_REQUEST);
             oldest.sendMessage(shuffleMessage);
+            oldest.disconnect();
         } catch (Exception e) {
-            this.shuffleInProgress = false;
             logger.error("Failed to send shuffle message, neighbour may be unreachable: " + e.getMessage());
-        } finally {
-            this.shuffleInProgress = false;
         }
     }
 
-    private void triggerIntroRandomWalk() {
+    public void triggerRandomWalk() {
         try {
-            this.shuffleInProgress = true;
             if (neighbourManager.size() == 0) {
-                this.shuffleInProgress = false;
                 logger.info("Not enough neighbours available to perform shuffle. At least one neighbour is required.");
                 return;
             }
@@ -338,23 +289,10 @@ public class CyclonManager {
 
             MessageWrapper randomWalkMessage = createRandomWalkMessage(aggregationServer.getId(), List.of(), neighbourManager.cacheSize(), RandomWalkMessageType.RANDOM_WALK_REQUEST);
             oldest.sendMessage(randomWalkMessage);
+            oldest.disconnect();
         } catch (Exception e) {
-            this.shuffleInProgress = false;
             logger.error("Failed to send shuffle message, neighbour may be unreachable: " + e.getMessage());
-        } finally {
-            this.shuffleInProgress = false;
         } 
-    }
-
-    private void handleBusyShuffle(Integer senderId) {
-        MessageWrapper busyMessage = this.createShuffleMessage(senderId, List.of(), ShuffleMessageType.SHUFFLE_BUSY);
-        Neighbour sender = new Neighbour(senderId, new PushEndpoint(this.context), 0, this.logger);
-
-        sender.connect();
-        sender.sendMessage(busyMessage);
-        sender.disconnect();
-        
-        logger.warn("Shuffle already in progress. Ignoring new shuffle message...");
     }
 
     private MessageWrapper createShuffleMessage(Integer senderId, List<Neighbour> peerEntries, ShuffleMessageType type) {

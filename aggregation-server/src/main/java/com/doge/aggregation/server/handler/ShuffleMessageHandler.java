@@ -40,10 +40,6 @@ public class ShuffleMessageHandler implements MessageHandler<MessageWrapper> {
             cyclonManager.handleShuffleRequest(senderId, peerEntries);
         } else if (type == ShuffleMessageType.SHUFFLE_RESPONSE) {
             cyclonManager.handleShuffleResponse(senderId, peerEntries);
-        } else if (type == ShuffleMessageType.SHUFFLE_BUSY) {
-            logger.warn("Received BUSY message from " + senderId);
-            cyclonManager.setShuffleInProgress(false);
-            return;
         } else {
             logger.error("Unknown shuffle message type: " + type);
             return;

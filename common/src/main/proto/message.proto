@@ -100,14 +100,12 @@ message ForwardUserOnlineMessage {
 enum ShuffleMessageType {
     SHUFFLE_REQUEST  = 0;
     SHUFFLE_RESPONSE = 1;
-    SHUFFLE_BUSY     = 2;
 }
 
 enum RandomWalkMessageType {
     RANDOM_WALK_REQUEST = 0;
     RANDOM_WALK_INTRO   = 1;
-    RANDOM_WALK_SHUFFLE = 2;
-    RANDOM_WALK_RESPONSE = 3;
+    RANDOM_WALK_RESPONSE = 2;
 }
 
 message PeerEntry {

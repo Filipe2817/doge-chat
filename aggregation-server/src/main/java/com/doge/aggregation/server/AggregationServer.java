@@ -119,10 +119,12 @@ public class AggregationServer {
             this.logger
         ));
 
+        cyclonManager.triggerRandomWalk();
+
         // Schedule periodic shuffle trigger every 10 seconds
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                cyclonManager.trigger();
+                cyclonManager.triggerShuffle();
             } catch(Exception e) {
                 logger.error("Error triggering shuffle: " + e.getMessage());
             }
