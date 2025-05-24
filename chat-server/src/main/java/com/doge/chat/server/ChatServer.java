@@ -142,7 +142,7 @@ public class ChatServer {
 
         proxyThread.start();
         workerThreads.forEach(Thread::start);
-        logger.info("[REP-WORKER] All internal workers initialized");
+        logger.info("[REP-WORKER] All internal workers initialized (proxied via port " + this.repPort + ")");
 
         try {
             pullThread.join();
