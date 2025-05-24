@@ -24,6 +24,7 @@ You can pass arguments to the client using the `-Dexec.args` option. For example
 
 ```bash
 mvn -pl client exec:java -Dexec.args="--name rui --topic uminho -as 6667"
+```
 
 You can list the available options for the client by running:
 
@@ -40,7 +41,7 @@ Running a chat server:
 mvn -pl chat-server exec:java -Dexec.args="-p 5555"
 ```
 
-You can list the available options for the chat server by running:
+As with the client, you can also run the following command: 
 
 ```bash
 mvn -pl chat-server exec:java -Dexec.args="--help"
@@ -48,6 +49,24 @@ mvn -pl chat-server exec:java -Dexec.args="--help"
 
 > [!NOTE]
 > Make sure you understand the role of the `-p` flag, since it is crucial for the server workflow. For example, if `-p` is set to `5555`, the server will bind a PULL socket to it. Subsequent port numbers will be used for other types of sockets.
+
+Running an aggregation server:
+
+```bash
+mvn -pl aggregation-server exec:java -Dexec.args="-p 6666 -cs 5555"
+```
+
+You can pass the `-i` flag to serve as an introductory node:
+
+```bash
+mvn -pl aggregation-server exec:java -Dexec.args="-p 7666 -cs 6555 -i 6666"
+```
+
+You can understand each option by running:
+
+```bash
+mvn -pl aggregation-server exec:java -Dexec.args="--help"
+```
 
 #### 💡 Tips
 
@@ -59,8 +78,10 @@ mvn -pl chat-server exec:java -Dexec.args="--help"
 Running a DHT node (from inside the `search-node` directory):
 
 ```bash
-sh scripts/launch_node.sh n1 # currently, we support nodes from 1 to 5
+sh scripts/launch_node.sh n1
 ```
+
+Currently, we support nodes numbered from 1 to 5.
 
 Running a simulated client:
 

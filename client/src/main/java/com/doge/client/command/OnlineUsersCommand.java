@@ -53,7 +53,11 @@ public class OnlineUsersCommand extends AbstractCommand {
         } else {
             console.info("Online users for topic " + "'" + topic + "':");
             for (String user : onlineUsers) {
-                console.info("- " + user);
+                if (user.equals(client.getId())) {
+                    console.info("- " + user + " (you)");
+                } else {
+                    console.info("- " + user);
+                }
             }
         }
     }

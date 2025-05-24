@@ -98,9 +98,14 @@ message ForwardUserOnlineMessage {
 // CYCLON
 
 enum ShuffleMessageType {
-    REQUEST = 0;
-    RESPONSE = 1;
-    BUSY = 2;
+    SHUFFLE_REQUEST = 0;
+    SHUFFLE_RESPONSE = 1;
+}
+
+enum RandomWalkMessageType {
+    RANDOM_WALK_REQUEST = 0;
+    RANDOM_WALK_INTRO = 1;
+    RANDOM_WALK_RESPONSE = 2;
 }
 
 message PeerEntry {
@@ -114,11 +119,18 @@ message ShuffleMessage {
     repeated PeerEntry entries = 3;
 }
 
+message RandomWalkMessage {
+    RandomWalkMessageType type = 1;
+    int32 senderId = 2;
+    int32 ttl = 3;
+    repeated PeerEntry entries = 4;
+}
+
 // Aggregation
 
 message AggregationStartMessage {
     string topic = 1;
-    string dotClientId = 2; // Will serve as id of the aggregation
+    string dotClientId = 2;
 }
 
 message AggregationResultMessage {
@@ -168,13 +180,14 @@ message MessageWrapper {
         ForwardUserOnlineMessage forwardUserOnlineMessage = 10;
 
         ShuffleMessage shuffleMessage = 11;
+        RandomWalkMessage randomWalkMessage = 12;
 
-        AggregationStartMessage aggregationStartMessage = 12;
-        AggregationResultMessage aggregationResultMessage = 13;
-        AggregationCurrentStateMessage aggregationCurrentStateMessage = 14;
-        GetChatServerStateMessage getChatServerStateMessage = 15;
-        ChatServerStateMessage chatServerStateMessage = 16;
-        NotifyNewTopicMessage notifyNewTopicMessage = 17;
-        NotifyNewTopicAckMessage notifyNewTopicAckMessage = 18;
+        AggregationStartMessage aggregationStartMessage = 13;
+        AggregationResultMessage aggregationResultMessage = 14;
+        AggregationCurrentStateMessage aggregationCurrentStateMessage = 15;
+        GetChatServerStateMessage getChatServerStateMessage = 16;
+        ChatServerStateMessage chatServerStateMessage = 17;
+        NotifyNewTopicMessage notifyNewTopicMessage = 18;
+        NotifyNewTopicAckMessage notifyNewTopicAckMessage = 19;
     }
 }
