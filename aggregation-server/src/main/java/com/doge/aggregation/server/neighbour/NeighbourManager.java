@@ -62,6 +62,7 @@ public class NeighbourManager {
                 removed = cache.remove(oldest.getId());
             }
         }
+
         cache.put(n.getId(), n);
         return removed;
     }
@@ -77,6 +78,7 @@ public class NeighbourManager {
                 candidates.add(n);
             }
         }
+
         Collections.shuffle(candidates, this.random);
         int num = Math.min(k, candidates.size());
         return new ArrayList<>(candidates.subList(0, num));

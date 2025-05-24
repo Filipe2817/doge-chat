@@ -34,6 +34,7 @@ public class AggregationServer {
     private DhtClient dhtClient;
 
     private NeighbourManager neighbourManager;
+    private CyclonManager cyclonManager;
     private GossipManager gossipManager;
     private Logger logger;
 
@@ -60,8 +61,16 @@ public class AggregationServer {
         this.reqEndpoint = reqEndpoint;
         this.dhtClient = dhtClient;
 
-        this.neighbourManager = neighbourManager;
         this.logger = logger;
+
+        this.neighbourManager = neighbourManager;
+        this.cyclonManager = new CyclonManager(
+            this.l,
+            this,
+            this.context,
+            this.neighbourManager,
+            this.logger
+        );
         this.gossipManager = new GossipManager(this.neighbourManager, this.logger);
     }
 
@@ -90,14 +99,6 @@ public class AggregationServer {
     }
 
     private void runPull() {
-        CyclonManager cyclonManager = new CyclonManager(
-            this.l,
-            this,
-            this.context,
-            this.neighbourManager,
-            this.logger
-        );
-
         ShuffleMessageHandler shuffleMessageHandler = new ShuffleMessageHandler(
             cyclonManager,
             this.logger
@@ -133,8 +134,9 @@ public class AggregationServer {
         while (this.running) {
             try {
                 this.pullEndpoint.receiveOnce();
-                logger.info("Neigbours cache");
-                logger.info(neighbourManager.toString());
+
+                logger.info("Neighbours cache");
+                System.out.println(neighbourManager.toString());
             } catch (HandlerNotFoundException | InvalidFormatException e) {
                 logger.debug("[PULL] Error while receiving message: " + e.getMessage());
                 continue;

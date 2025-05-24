@@ -98,13 +98,13 @@ message ForwardUserOnlineMessage {
 // CYCLON
 
 enum ShuffleMessageType {
-    SHUFFLE_REQUEST  = 0;
+    SHUFFLE_REQUEST = 0;
     SHUFFLE_RESPONSE = 1;
 }
 
 enum RandomWalkMessageType {
     RANDOM_WALK_REQUEST = 0;
-    RANDOM_WALK_INTRO   = 1;
+    RANDOM_WALK_INTRO = 1;
     RANDOM_WALK_RESPONSE = 2;
 }
 
@@ -130,7 +130,7 @@ message RandomWalkMessage {
 
 message AggregationStartMessage {
     string topic = 1;
-    string dotClientId = 2; // Will serve as id of the aggregation
+    string dotClientId = 2;
 }
 
 message AggregationResultMessage {

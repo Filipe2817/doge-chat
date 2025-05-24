@@ -14,10 +14,7 @@ public class RandomWalkMessageHandler implements MessageHandler<MessageWrapper> 
     private final CyclonManager cyclonManager;
     private final Logger logger;
 
-    public RandomWalkMessageHandler(
-        CyclonManager cyclonManager,
-        Logger logger
-    ) {
+    public RandomWalkMessageHandler(CyclonManager cyclonManager, Logger logger) {
         this.cyclonManager = cyclonManager;
         this.logger = logger;
     }
