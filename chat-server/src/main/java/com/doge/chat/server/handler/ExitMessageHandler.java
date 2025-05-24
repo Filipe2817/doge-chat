@@ -2,6 +2,7 @@ package com.doge.chat.server.handler;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -15,18 +16,23 @@ import com.doge.common.proto.ExitMessage;
 import com.doge.common.proto.ForwardUserOnlineMessage;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.MessageHandler;
-import com.doge.common.socket.zmq.PubEndpoint;
 
 public class ExitMessageHandler implements MessageHandler<MessageWrapper> {
     private final Logger logger;
 
-    private final PubEndpoint chatServerPubEndpoint;
+    private BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue;
+
     private final UserManager userManager;
 
-    public ExitMessageHandler(Logger logger, PubEndpoint chatServerPubEndpoint, UserManager userManager) {
+    public ExitMessageHandler(
+        Logger logger, 
+        BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue,
+        UserManager userManager
+    ) {
         this.logger = logger;
 
-        this.chatServerPubEndpoint = chatServerPubEndpoint;
+        this.chatServerPubQueue = chatServerPubQueue;
+
         this.userManager = userManager;
     }
 
@@ -45,7 +51,10 @@ public class ExitMessageHandler implements MessageHandler<MessageWrapper> {
         Set<String> onlineUsers = this.userManager.getOnlineUsersForTopic(topic);
 
         MessageWrapper forward = createForwardUserOnlineMessage(topic, clientId, dotStore, onlineUsers);
-        this.chatServerPubEndpoint.send(topic, forward);
+        try {
+            this.chatServerPubQueue.put(Pair.of(topic, forward));
+        } catch (InterruptedException ignored) {}
+
         logger.info("Forwarded exit message to topic '" + topic + "'");
     }
     

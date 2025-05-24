@@ -1,6 +1,9 @@
 package com.doge.chat.server.handler;
 
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.doge.chat.server.ChatServer;
 import com.doge.chat.server.causal.VectorClock;
@@ -18,7 +21,8 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
     private final Logger logger;
 
     private final PubEndpoint clientPubEndpoint;
-    private final PubEndpoint chatServerPubEndpoint;
+    private BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue;
+
     private final VectorClockManager vectorClockManager;
     private final LogManager logsManager;
 
@@ -26,7 +30,7 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         ChatServer chatServer,
         Logger logger,
         PubEndpoint clientPubEndpoint,
-        PubEndpoint chatServerPubEndpoint,
+        BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue,
         VectorClockManager vectorClockManager,
         LogManager logsManager
     ) {
@@ -34,7 +38,8 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         this.logger = logger;
 
         this.clientPubEndpoint = clientPubEndpoint;
-        this.chatServerPubEndpoint = chatServerPubEndpoint;
+        this.chatServerPubQueue = chatServerPubQueue;
+
         this.vectorClockManager = vectorClockManager;
         this.logsManager = logsManager;
     }
@@ -54,7 +59,9 @@ public class ChatMessageHandler implements MessageHandler<MessageWrapper> {
         logger.debug("Incremented self vector clock for topic " + "'" + topic + "'. Clock is now: " + currenVectorClock);
 
         MessageWrapper forward = createForwardMessage(chatMessage, currenVectorClock.asData());
-        this.chatServerPubEndpoint.send(topic, forward);
+        try {
+            this.chatServerPubQueue.put(Pair.of(topic, forward));
+        } catch (InterruptedException ignored) {}
 
         logsManager.addLog(forward.getForwardChatMessage());
 

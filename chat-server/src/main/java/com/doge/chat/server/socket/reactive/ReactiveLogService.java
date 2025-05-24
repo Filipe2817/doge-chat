@@ -29,7 +29,7 @@ public class ReactiveLogService extends Rx3LogServiceGrpc.LogServiceImplBase {
             // when the `getLogs` is invoked and not when the client
             // is ready to consume from the stream
             //
-            // This way, we maximize for having a strong consistency
+            // This way, we maximize for having a stronger consistency
             // regarding the logs each client receives
             return Flowable.defer(() -> {
                 List<LogMessage> snapshot = this.logManager.snapshot(req.getTopic());
