@@ -12,7 +12,6 @@ import com.doge.chat.server.user.UserManager;
 import com.doge.common.Logger;
 import com.doge.common.socket.zmq.PubEndpoint;
 import com.doge.common.socket.zmq.PullEndpoint;
-import com.doge.common.socket.zmq.RepEndpoint;
 import com.doge.common.socket.zmq.SubEndpoint;
 
 import picocli.CommandLine;
@@ -52,11 +51,6 @@ public class Main implements Callable<Integer> {
             pullEndpoint.bindSocket("localhost", pullPort);
             logger.debug("[PULL] Bound to port " + pullPort);
 
-            int repPort = this.port + 1;
-            RepEndpoint repEndpoint = new RepEndpoint(context);
-            repEndpoint.bindSocket("localhost", repPort);
-            logger.debug("[REP] Bound to port " + repPort);
-
             int clientPubPort = this.port + 2;
             PubEndpoint clientPubEndpoint = new PubEndpoint(context);
             clientPubEndpoint.bindSocket("localhost", clientPubPort);
@@ -82,14 +76,17 @@ public class Main implements Callable<Integer> {
             UserManager userManager = new UserManager(this.port);
             logger.debug("User manager initialized for port " + this.port);
 
+            int repPort = this.port + 1;
+
             ChatServer chatServer = new ChatServer(
                 this.port,
+                context,
                 pullEndpoint,
                 subEndpoint,
-                repEndpoint,
+                repPort,
                 clientPubEndpoint,
-                chatServerPubEndpoint,
                 reactiveEndpoint,
+                chatServerPubEndpoint,
                 logManager,
                 vectorClockManager,
                 userManager,

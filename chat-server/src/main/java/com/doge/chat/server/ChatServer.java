@@ -1,5 +1,17 @@
 package com.doge.chat.server;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.zeromq.SocketType;
+import org.zeromq.ZContext;
+import org.zeromq.ZMQ;
+import org.zeromq.ZMQ.Socket;
+
 import com.doge.chat.server.causal.CausalDeliveryManager;
 import com.doge.chat.server.causal.VectorClockManager;
 import com.doge.chat.server.handler.AnnounceMessageHandler;
@@ -16,6 +28,7 @@ import com.doge.chat.server.user.UserManager;
 import com.doge.common.Logger;
 import com.doge.common.exception.HandlerNotFoundException;
 import com.doge.common.exception.InvalidFormatException;
+import com.doge.common.proto.MessageWrapper;
 import com.doge.common.proto.MessageWrapper.MessageTypeCase;
 import com.doge.common.socket.zmq.PubEndpoint;
 import com.doge.common.socket.zmq.PullEndpoint;
@@ -27,12 +40,21 @@ public class ChatServer {
     private final int id;
     private int topicsBeingServed;
 
+    private ZContext context;
     private PullEndpoint pullEndpoint;
     private SubEndpoint subEndpoint;
-    private RepEndpoint repEndpoint;
+
+    private int repPort;
+    private Socket frontendSocket;
+    private Socket backendSocket;
+    private List<RepEndpoint> workerSockets;
+
     private PubEndpoint clientPubEndpoint;
-    private PubEndpoint chatServerPubEndpoint;
     private ReactiveGrpcEndpoint reactiveEndpoint;
+
+    private PubEndpoint chatServerPubEndpoint;
+    // Pair of topic and message
+    private BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue;
 
     private VectorClockManager vectorClockManager;
     private LogManager logManager;
@@ -43,12 +65,13 @@ public class ChatServer {
 
     public ChatServer(
         int id,
+        ZContext context,
         PullEndpoint pullEndpoint,
         SubEndpoint subEndpoint,
-        RepEndpoint repEndpoint,
+        int repPort,
         PubEndpoint clientPubEndpoint,
-        PubEndpoint chatServerPubEndpoint,
         ReactiveGrpcEndpoint reactiveEndpoint,
+        PubEndpoint chatServerPubEndpoint,
         LogManager logManager,
         VectorClockManager vectorClockManager,
         UserManager userManager,
@@ -58,12 +81,18 @@ public class ChatServer {
         this.id = id;
         this.topicsBeingServed = 0;
 
+        this.context = context;
         this.pullEndpoint = pullEndpoint;
-        this.repEndpoint = repEndpoint;
         this.subEndpoint = subEndpoint;
+
+        this.repPort = repPort;
+        this.workerSockets = Collections.synchronizedList(new ArrayList<>());
+
         this.clientPubEndpoint = clientPubEndpoint;
-        this.chatServerPubEndpoint = chatServerPubEndpoint;
         this.reactiveEndpoint = reactiveEndpoint;
+
+        this.chatServerPubEndpoint = chatServerPubEndpoint;
+        this.chatServerPubQueue = new LinkedBlockingQueue<>();
 
         this.logManager = logManager;
         this.vectorClockManager = vectorClockManager;
@@ -93,26 +122,44 @@ public class ChatServer {
     public void run() {
         this.running = true;
 
-        Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
-        Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
-        Thread subscriberThread = new Thread(() -> this.runSub(), "Sub-Thread");
-        Thread reactiveThread = new Thread(() -> this.runReactive(), "Reactive-Thread");
+        Thread pullThread = new Thread(this::runPull, "Pull-Thread");
+        Thread subThread = new Thread(this::runSub, "Sub-Thread");
+        Thread reactiveThread = new Thread(this::runReactive, "Reactive-Thread");
+        Thread chatServerPubThread = new Thread(this::runChatServerPub, "Chat-Server-Pub-Thread");
+
+        Thread proxyThread = new Thread(this::runRepProxy, "Rep-Proxy-Thread");
+        int workerCount = Runtime.getRuntime().availableProcessors();
+        List<Thread> workerThreads = new ArrayList<>();
+        for (int i = 0; i < workerCount; i++) {
+            Thread wt = new Thread(this::runRepWorker, "Rep-Worker-" + i);
+            workerThreads.add(wt);
+        }
+
+        pullThread.start();
+        subThread.start();
+        reactiveThread.start();
+        chatServerPubThread.start();
+
+        proxyThread.start();
+        workerThreads.forEach(Thread::start);
+        logger.info("[REP-WORKER] All internal workers initialized");
 
         try {
-            pullThread.start();
-            repThread.start();
-            subscriberThread.start();
-            reactiveThread.start();
-
             pullThread.join();
-            repThread.join();
-            subscriberThread.join();
+            subThread.join();
             reactiveThread.join();
+            chatServerPubThread.join();
+
+            proxyThread.join();
+            for (Thread wt : workerThreads) wt.join();
         } catch (InterruptedException e) {
             pullThread.interrupt();
-            repThread.interrupt();
-            subscriberThread.interrupt();
+            subThread.interrupt();
             reactiveThread.interrupt();
+            chatServerPubThread.interrupt();
+
+            proxyThread.interrupt();
+            workerThreads.forEach(Thread::interrupt);
         } finally {
             this.stop();
         }
@@ -123,14 +170,14 @@ public class ChatServer {
             this,
             this.logger,
             this.clientPubEndpoint,
-            this.chatServerPubEndpoint,
+            this.chatServerPubQueue,
             this.vectorClockManager,
             this.logManager
         ));
 
         this.pullEndpoint.on(MessageTypeCase.EXITMESSAGE, new ExitMessageHandler(
-            this.logger, 
-            this.chatServerPubEndpoint, 
+            this.logger,
+            this.chatServerPubQueue,
             this.userManager
         )); 
 
@@ -145,53 +192,18 @@ public class ChatServer {
                 break;
             }
         }
-    }
-
-    private void runRep() {
-        this.repEndpoint.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(
-            this.logger, 
-            this.repEndpoint, 
-            this.userManager
-        ));
-        
-        this.repEndpoint.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
-            this.logger,
-            this.chatServerPubEndpoint,
-            this.repEndpoint,
-            this.userManager
-        ));
-
-        this.repEndpoint.on(MessageTypeCase.GETCHATSERVERSTATEMESSAGE, new GetChatServerStateMessageHandler(
-            this,
-            this.repEndpoint,
-            this.userManager
-        ));
-
-        this.repEndpoint.on(MessageTypeCase.NOTIFYNEWTOPICMESSAGE, new NotifyNewTopicMessageHandler(
-            this,
-            this.logger,
-            this.repEndpoint,
-            this.subEndpoint,
-            this.vectorClockManager,
-            this.userManager
-        ));
-
-        while (this.running) {
-            try {
-                this.repEndpoint.receiveOnce();
-            } catch (HandlerNotFoundException | InvalidFormatException e) {
-                logger.debug("[REP] Error while receiving message: " + e.getMessage());
-                continue;
-            } catch (Exception e) {
-                e.printStackTrace();
-                break;
-            }
-        }
-    }
+    } 
 
     private void runSub() {
-        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(this.logger, this.causalDeliveryManager));
-        this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(this.logger, this.userManager));
+        this.subEndpoint.on(MessageTypeCase.FORWARDCHATMESSAGE, new ForwardChatMessageHandler(
+            this.logger, 
+            this.causalDeliveryManager
+        ));
+
+        this.subEndpoint.on(MessageTypeCase.FORWARDUSERONLINEMESSAGE, new ForwardUserOnlineMessageHandler(
+            this.logger, 
+            this.userManager
+        ));
 
         while (this.running) {
             try {
@@ -218,14 +230,93 @@ public class ChatServer {
         }
     }
 
+    private void runChatServerPub() {
+        while (this.running) {
+            try {
+                logger.info("[CHAT-SERVER-PUB] Started dequeuing messages");
+
+                Pair<String, MessageWrapper> message = this.chatServerPubQueue.take();
+                String topic = message.getLeft();
+                MessageWrapper wrapper = message.getRight();
+
+                this.chatServerPubEndpoint.send(topic, wrapper);
+            } catch (InterruptedException e) {
+                logger.error("[CHAT-SERVER-PUB] Interruped while dequeuing messages: " + e.getMessage());
+                break;
+            } catch (Exception e) {
+                logger.error("[CHAT-SERVER-PUB] Error while dequeuing messages: " + e.getMessage());
+                break;
+            }
+        }
+    }
+
+    private void runRepProxy() {
+        this.frontendSocket = context.createSocket(SocketType.ROUTER);
+        frontendSocket.bind("tcp://" + "localhost" + ":" + this.repPort);
+
+        this.backendSocket = context.createSocket(SocketType.DEALER);
+        backendSocket.bind("inproc://rep-workers");
+
+        ZMQ.proxy(frontendSocket, backendSocket, null);
+    }
+
+    private void runRepWorker() {
+        RepEndpoint worker = new RepEndpoint(context);
+        worker.inprocConnectSocket("rep-workers");
+        workerSockets.add(worker);
+
+        worker.on(MessageTypeCase.GETONLINEUSERSMESSAGE, new GetOnlineUsersMessageHandler(
+            this.logger, 
+            worker,
+            this.userManager
+        ));
+        
+        worker.on(MessageTypeCase.ANNOUNCEMESSAGE, new AnnounceMessageHandler(
+            this.logger,
+            this.chatServerPubQueue,
+            worker,
+            this.userManager
+        ));
+
+        worker.on(MessageTypeCase.GETCHATSERVERSTATEMESSAGE, new GetChatServerStateMessageHandler(
+            this,
+            worker,
+            this.userManager
+        ));
+
+        worker.on(MessageTypeCase.NOTIFYNEWTOPICMESSAGE, new NotifyNewTopicMessageHandler(
+            this,
+            this.logger,
+            worker,
+            this.subEndpoint,
+            this.vectorClockManager,
+            this.userManager
+        ));
+
+        while (this.running) {
+            try {
+                worker.receiveOnce();
+            } catch (HandlerNotFoundException | InvalidFormatException e) {
+                logger.debug("[REP-WORKER] Error while receiving message: " + e.getMessage());
+                continue;
+            } catch (Exception e) {
+                e.printStackTrace();
+                break;
+            }
+        }
+    }
+
     private void stop() {
         this.running = false;
 
-        this.pullEndpoint.close();
-        this.repEndpoint.close();
-        this.subEndpoint.close();
-        this.clientPubEndpoint.close();
-        this.chatServerPubEndpoint.close();
+        if (this.pullEndpoint != null) this.pullEndpoint.close();
+        if (this.subEndpoint != null) this.subEndpoint.close();
+        if (this.clientPubEndpoint != null) this.clientPubEndpoint.close();
+        if (this.chatServerPubEndpoint != null) this.chatServerPubEndpoint.close();
+
+        if (this.frontendSocket != null) this.frontendSocket.close();
+        if (this.backendSocket != null) this.backendSocket.close();
+        for (RepEndpoint endpoint : this.workerSockets) endpoint.close();
 
         logger.info("Chat server stopped");
     }

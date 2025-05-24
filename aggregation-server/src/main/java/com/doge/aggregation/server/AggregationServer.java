@@ -70,8 +70,8 @@ public class AggregationServer {
     public void run() {
         this.running = true;
 
-        Thread pullThread = new Thread(() -> this.runPull(), "Pull-Thread");
-        Thread repThread = new Thread(() -> this.runRep(), "Rep-Thread");
+        Thread pullThread = new Thread(this::runPull, "Pull-Thread");
+        Thread repThread = new Thread(this::runRep, "Rep-Thread");
 
         try {
             pullThread.start();

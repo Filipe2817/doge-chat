@@ -17,6 +17,11 @@ public class RepEndpoint extends Endpoint<MessageWrapper> {
         transport.socket.bind("tcp://" + address + ":" + port);
     }
 
+    public void inprocConnectSocket(String address) {
+        ZmqRepTransport transport = this.getTransportInternal();
+        transport.socket.connect("inproc://" + address);
+    }
+
     private ZmqRepTransport getTransportInternal() {
         return (ZmqRepTransport) super.getTransport();
     }

@@ -26,7 +26,7 @@ public class GossipManager {
 
     // Map from aggregationId to record `AggregationState`
     //
-    // aggregationId = clientId that started the aggregation
+    // aggregationId = dotted clientId that started the aggregation
     private Map<String, AggregationState> aggregations;
 
     private NeighbourManager neighbourManager;
@@ -151,7 +151,7 @@ public class GossipManager {
 
     public List<ChatServerState> getBestChatServers(String aggregationId) {
         AggregationState s = aggregations.get(aggregationId);
-        return s == null ? List.of() : s.chatServers();
+        return s == null ? new ArrayList<>() : s.chatServers();
     }
     
     /* Messaging & Gossiping */
