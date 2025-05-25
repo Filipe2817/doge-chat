@@ -2,10 +2,12 @@ package com.doge.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 import org.zeromq.ZContext;
+import org.zeromq.ZMonitor;
 
 import com.doge.client.command.CommandManager;
 import com.doge.client.command.ExitCommand;
@@ -32,17 +34,24 @@ import com.doge.common.socket.zmq.SubEndpoint;
 
 public class Client {
     private volatile boolean running;
-
     private final String id;
+
     private String currentTopic;
     private int currentChatServer;
+    private List<Integer> otherChatServers;
+    private static final Random RANDOM = new Random();
+
     private InetSocketAddress dhtNode;
+
     private int aggregationServerId;
     private int aggregationCount;
 
     private ZContext context;
     private PushEndpoint pushEndpoint;
+
     private ReqEndpoint chatServerReqEndpoint;
+    private ZMonitor chatMonitor;
+
     private ReqEndpoint aggregationServerReqEndpoint;
     private SubEndpoint subEndpoint;
     private ReactiveGrpcClient reactiveClient;
@@ -59,10 +68,14 @@ public class Client {
         ZContext context
     ) throws IOException {
         this.running = false;
-
         this.id = name;
+
         this.currentTopic = topic;
+        this.currentChatServer = -1;
+        this.otherChatServers = new ArrayList<>();
+
         this.dhtNode = dhtNode;
+
         this.aggregationServerId = aggregationServerId;
         this.aggregationCount = 0;
 
@@ -85,8 +98,38 @@ public class Client {
         this.currentTopic = currentTopic;
     }
 
-    public void setCurrentChatServer(int nextServer) {
-        this.currentChatServer = nextServer;
+    public void setCurrentChatServer(int currentChatServer) {
+        this.currentChatServer = currentChatServer;
+    }
+
+    public int updateChatServers(List<Integer> chatServers) {
+        int randomIndex = RANDOM.nextInt(chatServers.size());
+        int chosen = chatServers.get(randomIndex);
+
+        this.otherChatServers.clear();
+        for (Integer chatServer : chatServers) {
+            if (!chatServer.equals(chosen)) {
+                this.otherChatServers.add(chatServer);
+            }
+        }
+
+        return chosen;
+    }
+
+    public int getCurrentChatServer() {
+        return currentChatServer;
+    }
+
+    public int getRandomChatServerWithDelete() {
+        if (this.otherChatServers.isEmpty()) {
+            return -1;
+        }
+
+        int randomIndex = RANDOM.nextInt(this.otherChatServers.size());
+        int chosen = this.otherChatServers.get(randomIndex);
+        this.otherChatServers.remove(randomIndex);
+
+        return chosen;
     }
 
     public int getAggregationCount() {
@@ -201,12 +244,10 @@ public class Client {
                 return -1;
             }
 
-            // Randomly select a chat server from the list
-            Random random = new Random();
-            int randomIndex = random.nextInt(chatServers.size());
-            int chosenChatServer = chatServers.get(randomIndex);
+            console.warn("Found C chat servers for topic '" + this.currentTopic + "': " + chatServers);
+            int chosenChatServer = this.updateChatServers(chatServers);
 
-            console.info("Found chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
+            console.info("Chose chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
             return chosenChatServer;
         } catch (KeyNotFoundException e) {
             console.error("No chat server found for topic '" + this.currentTopic + "'");
@@ -231,6 +272,7 @@ public class Client {
                 .build();
 
         this.aggregationServerReqEndpoint.send(messageWrapper);
+        console.debug("[REQ | Aggregation server] Sent aggregation start message");
 
         try {
             MessageWrapper response = this.aggregationServerReqEndpoint.receiveOnceWithoutHandle();
@@ -238,10 +280,7 @@ public class Client {
             List<Integer> chatServers = result.getServerIdsList();
             console.warn("Got response from aggregation server. Found C chat servers: " + chatServers);
 
-            // Randomly select a chat server from the list
-            Random random = new Random();
-            int randomIndex = random.nextInt(chatServers.size());
-            int chosenChatServer = chatServers.get(randomIndex);
+            int chosenChatServer = this.updateChatServers(chatServers);
 
             console.info("Chose chat server with id '" + chosenChatServer + "' for topic '" + this.currentTopic + "'");
             return chosenChatServer;
@@ -254,27 +293,19 @@ public class Client {
     public void setupConnectionsToChatServer() {
         int pullPort = this.currentChatServer;
         this.pushEndpoint = new PushEndpoint(this.context);
-        this.pushEndpoint.setLinger(2000);
-        pushEndpoint.connectSocket("localhost", pullPort);
-        console.debug("[PUSH] Connected on port " + pullPort);
+        this.setupPushEndpoint(pullPort);
         
         int repPort = this.currentChatServer + 1;
         this.chatServerReqEndpoint = new ReqEndpoint(this.context);
-        chatServerReqEndpoint.connectSocket("localhost", repPort);
-        console.debug("[REQ | Chat server] Connected on port " + repPort);
+        this.setupChatServerReqEndpoint(repPort, true);
 
         int pubPort = this.currentChatServer + 2;
         this.subEndpoint = new SubEndpoint(this.context);
-        subEndpoint.connectSocket("localhost", pubPort);
-        console.debug("[SUB] Connected on port " + pubPort);
-
-        subEndpoint.subscribe(this.currentTopic);
-        console.info("You are now subscribed to topic '" + this.currentTopic + "'");
+        this.setupSubEndpoint(pubPort);
 
         int reactivePort = this.currentChatServer + 4;
         this.reactiveClient = new ReactiveGrpcClient(console);
-        reactiveClient.setup("localhost", reactivePort);
-        console.debug("[REACTIVE] Connected on port " + reactivePort);
+        this.setupReactiveClient(reactivePort);
 
         console.info("Announcing to chat server...");
         int status = this.maybeAnnounceToServer();
@@ -287,27 +318,19 @@ public class Client {
     public void resetConnectionsToChatServer() {
         int pullPort = this.currentChatServer;
         this.pushEndpoint.disconnectSocket();
-        pushEndpoint.connectSocket("localhost", pullPort);
-        pushEndpoint.setLinger(2000);
-        console.debug("[PUSH] Connected on port " + pullPort);
+        this.setupPushEndpoint(pullPort);
 
         int repPort = this.currentChatServer + 1;
         this.chatServerReqEndpoint.disconnectSocket();
-        chatServerReqEndpoint.connectSocket("localhost", repPort);
-        console.debug("[REQ | Chat server] Connected on port " + repPort);
+        this.setupChatServerReqEndpoint(repPort, false);
 
         int pubPort = this.currentChatServer + 2;
         this.subEndpoint.disconnectSocket();
-        subEndpoint.connectSocket("localhost", pubPort);
-        console.debug("[SUB] Connected on port " + pubPort);
-
-        subEndpoint.subscribe(this.currentTopic);
-        console.info("You are now subscribed to topic '" + this.currentTopic + "'");
+        this.setupSubEndpoint(pubPort);
 
         int reactivePort = this.currentChatServer + 4;
         this.reactiveClient.close();
-        reactiveClient.setup("localhost", reactivePort);
-        console.debug("[REACTIVE] Connected on port " + reactivePort);
+        this.setupReactiveClient(reactivePort);
 
         console.info("Announcing to chat server...");
         int status = this.maybeAnnounceToServer();
@@ -315,6 +338,61 @@ public class Client {
             this.stop();
             return;
         }
+    }
+
+    private void setupPushEndpoint(int port) {
+        this.pushEndpoint.setLinger(2000);
+        this.pushEndpoint.connectSocket("localhost", port);
+        console.debug("[PUSH] Connected on port " + port);
+    }
+
+    private void setupChatServerReqEndpoint(int port, boolean enableMonitor) {
+        this.chatServerReqEndpoint.setHeartbeatInterval(1000);
+        this.chatServerReqEndpoint.setHeartbeatTimeout(3000);
+        this.chatServerReqEndpoint.setHeartbeatTTL(3000);
+        this.chatServerReqEndpoint.connectSocket("localhost", port);
+        
+        if (enableMonitor) {
+            this.chatMonitor = new ZMonitor(this.context, this.chatServerReqEndpoint.getSocket());
+            chatMonitor.add(ZMonitor.Event.DISCONNECTED);
+            chatMonitor.add(ZMonitor.Event.CONNECTED);
+            chatMonitor.start();
+
+            new Thread(() -> {
+                while (this.running) {
+                    ZMonitor.ZEvent event = chatMonitor.nextEvent(1500);
+                    if (event != null && event.type == ZMonitor.Event.DISCONNECTED) {
+                        console.error("[REQ | Chat server] Chat server died. Connecting to other chat server...");
+
+                        int newChatServer = this.getRandomChatServerWithDelete();
+                        if (newChatServer == -1) {
+                            console.error("No other chat servers available. Stopping client...");
+                            this.stop();
+                            return;
+                        }
+
+                        console.info("Connecting to new chat server with id " + newChatServer);
+                        this.currentChatServer = newChatServer;
+                        this.resetConnectionsToChatServer();
+                    }
+                }
+            }, "ChatServer-Monitor-Thread").start();
+        }
+
+        console.debug("[REQ | Chat server] Connected on port (also monitoring chat server) " + port);
+    }
+
+    private void setupSubEndpoint(int port) {
+        this.subEndpoint.connectSocket("localhost", port);
+        console.debug("[SUB] Connected on port " + port);
+
+        this.subEndpoint.subscribe(this.currentTopic);
+        console.info("You are now subscribed to topic '" + this.currentTopic + "'");
+    }
+
+    private void setupReactiveClient(int port) {
+        this.reactiveClient.setup("localhost", port);
+        console.debug("[REACTIVE] Connected on port " + port);
     }
 
     private int maybeAnnounceToServer() {
@@ -363,5 +441,6 @@ public class Client {
         }
 
         console.info("Client stopped. Exiting...");
+        System.exit(0);
     }
 }

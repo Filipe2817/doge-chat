@@ -231,20 +231,20 @@ public class ChatServer {
     }
 
     private void runChatServerPub() {
+        logger.info("[PUB | Chat server queue] Started dequeuing messages");
+
         while (this.running) {
             try {
-                logger.info("[CHAT-SERVER-PUB] Started dequeuing messages");
-
                 Pair<String, MessageWrapper> message = this.chatServerPubQueue.take();
                 String topic = message.getLeft();
                 MessageWrapper wrapper = message.getRight();
 
                 this.chatServerPubEndpoint.send(topic, wrapper);
             } catch (InterruptedException e) {
-                logger.error("[CHAT-SERVER-PUB] Interruped while dequeuing messages: " + e.getMessage());
+                logger.error("[PUB | Chat server queue] Interruped while dequeuing messages: " + e.getMessage());
                 break;
             } catch (Exception e) {
-                logger.error("[CHAT-SERVER-PUB] Error while dequeuing messages: " + e.getMessage());
+                logger.error("[PUB | Chat server queue] Error while dequeuing messages: " + e.getMessage());
                 break;
             }
         }

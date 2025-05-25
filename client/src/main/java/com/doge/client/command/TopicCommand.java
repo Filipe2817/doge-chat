@@ -1,7 +1,6 @@
 package com.doge.client.command;
 
 import java.util.List;
-import java.util.Random;
 
 import com.doge.client.Client;
 import com.doge.client.Console;
@@ -20,8 +19,6 @@ public class TopicCommand extends AbstractCommand {
     private PushEndpoint pushEndpoint;
     private ReqEndpoint aggregationServerReqEndpoint;
     private DhtClient dhtClient;
-
-    private static final Random RANDOM = new Random();
 
     public TopicCommand(
         Client client,
@@ -78,9 +75,7 @@ public class TopicCommand extends AbstractCommand {
                 return -1;
             }
 
-            // Randomly select a chat server from the list
-            int randomIndex = RANDOM.nextInt(chatServers.size());
-            int chosenChatServer = chatServers.get(randomIndex);
+            int chosenChatServer = this.client.updateChatServers(chatServers);
 
             console.info("Found chat server with id '" + chosenChatServer + "' for topic '" + topic + "'");
             return chosenChatServer;
@@ -109,6 +104,7 @@ public class TopicCommand extends AbstractCommand {
                 .build();
 
         this.aggregationServerReqEndpoint.send(messageWrapper);
+        console.debug("[REQ | Aggregation server] Sent aggregation start message");
 
         try {
             MessageWrapper response = this.aggregationServerReqEndpoint.receiveOnceWithoutHandle();
@@ -116,9 +112,7 @@ public class TopicCommand extends AbstractCommand {
             List<Integer> chatServers = result.getServerIdsList();
             console.warn("Got response from aggregation server. Found C chat servers: " + chatServers);
 
-            // Randomly select a chat server from the list
-            int randomIndex = RANDOM.nextInt(chatServers.size());
-            int chosenChatServer = chatServers.get(randomIndex);
+            int chosenChatServer = client.updateChatServers(chatServers);
 
             console.info("Chose chat server with id '" + chosenChatServer + "' for topic '" + topic + "'");
             return chosenChatServer;

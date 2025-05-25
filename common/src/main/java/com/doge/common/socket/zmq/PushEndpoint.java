@@ -15,11 +15,6 @@ public class PushEndpoint extends Endpoint<MessageWrapper> {
         super(new ZmqPushTransport(context.createSocket(SocketType.PUSH)), new ProtobufCodec());
     }
 
-    public void setLinger(int linger) {
-        ZmqPushTransport transport = this.getTransportInternal();
-        transport.socket.setLinger(linger);
-    }
-
     public void connectSocket(String address, int port) {
         ZmqPushTransport transport = this.getTransportInternal();
         transport.socket.connect("tcp://" + address + ":" + port);
@@ -31,6 +26,11 @@ public class PushEndpoint extends Endpoint<MessageWrapper> {
     public void disconnectSocket() {
         ZmqPushTransport transport = this.getTransportInternal();
         transport.socket.disconnect("tcp://" + address + ":" + port);
+    }
+
+    public void setLinger(int linger) {
+        ZmqPushTransport transport = this.getTransportInternal();
+        transport.socket.setLinger(linger);
     }
 
     private ZmqPushTransport getTransportInternal() {
