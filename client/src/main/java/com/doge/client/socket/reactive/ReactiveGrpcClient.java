@@ -1,5 +1,7 @@
 package com.doge.client.socket.reactive;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.doge.client.Client;
@@ -10,6 +12,7 @@ import com.doge.common.proto.UserLogRequestMessage;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
@@ -21,6 +24,9 @@ public class ReactiveGrpcClient {
     private Rx3LogServiceGrpc.RxLogServiceStub stub;
     private ManagedChannel channel;
     private Disposable currentSubscription;
+
+    private ExecutorService virtualThreadExecutor;
+    private Scheduler virtualThreadScheduler;
 
     public ReactiveGrpcClient(Client client, Console console) {
         this.client = client;
@@ -34,6 +40,9 @@ public class ReactiveGrpcClient {
             .build();
 
         this.stub = Rx3LogServiceGrpc.newRxStub(channel);
+
+        this.virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        this.virtualThreadScheduler = Schedulers.from(virtualThreadExecutor);
     }
 
     public void close() {
@@ -44,6 +53,11 @@ public class ReactiveGrpcClient {
 
         if (channel != null) {
             channel.shutdown();
+
+            if (virtualThreadExecutor != null && !virtualThreadExecutor.isShutdown()) {
+                virtualThreadExecutor.shutdown();
+                console.info("[LOGS] Virtual thread executor shut down");
+            }
 
             try {
                 if (!channel.awaitTermination(3, TimeUnit.SECONDS)) {
@@ -73,8 +87,8 @@ public class ReactiveGrpcClient {
             .build();
 
         currentSubscription = stub.getLogs(Single.just(request))
-            .subscribeOn(Schedulers.io())
-            .observeOn(Schedulers.io(), false, 32)
+            .subscribeOn(virtualThreadScheduler)
+            .observeOn(virtualThreadScheduler, false, 32)
             .subscribe(
                 resp -> console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),
@@ -95,8 +109,8 @@ public class ReactiveGrpcClient {
             .build();
 
         currentSubscription = stub.getUserLogs(Single.just(request))
-            .subscribeOn(Schedulers.io())
-            .observeOn(Schedulers.io(), false, 32)
+            .subscribeOn(virtualThreadScheduler)
+            .observeOn(virtualThreadScheduler, false, 32)
             .subscribe(
                 resp -> console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),

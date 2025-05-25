@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.zeromq.SocketType;
@@ -53,6 +54,7 @@ public class ChatServer {
     private ReactiveGrpcEndpoint reactiveEndpoint;
 
     private PubEndpoint chatServerPubEndpoint;
+
     // Pair of topic and message
     private BlockingQueue<Pair<String, MessageWrapper>> chatServerPubQueue;
 
@@ -122,44 +124,61 @@ public class ChatServer {
     public void run() {
         this.running = true;
 
-        Thread pullThread = new Thread(this::runPull, "Pull-Thread");
-        Thread subThread = new Thread(this::runSub, "Sub-Thread");
-        Thread reactiveThread = new Thread(this::runReactive, "Reactive-Thread");
-        Thread chatServerPubThread = new Thread(this::runChatServerPub, "Chat-Server-Pub-Thread");
+        List<Thread> threads = new ArrayList<>();
 
-        Thread proxyThread = new Thread(this::runRepProxy, "Rep-Proxy-Thread");
+        Thread pullThread = Thread.ofVirtual()
+            .name("Pull-Thread")
+            .start(this::runPull);
+
+        threads.add(pullThread);
+
+        Thread subThread = Thread.ofVirtual()
+            .name("Sub-Thread")
+            .start(this::runSub);
+
+        threads.add(subThread);
+
+        Thread reactiveThread = Thread.ofVirtual()
+            .name("Reactive-Thread")
+            .start(this::runReactive);
+
+        threads.add(reactiveThread);
+
+        Thread chatServerPubThread = Thread.ofVirtual()
+            .name("Chat-Server-Pub-Thread")
+            .start(this::runChatServerPub);
+
+        threads.add(chatServerPubThread);
+
+        Thread proxyThread = Thread.ofVirtual()
+            .name("Rep-Proxy-Thread")
+            .start(this::runRepProxy);
+
+        threads.add(proxyThread);
+        
+        ThreadFactory workerFactory = Thread.ofVirtual()
+            .name("Rep-Worker-Factory", 0)
+            .factory();
+
         int workerCount = Runtime.getRuntime().availableProcessors();
-        List<Thread> workerThreads = new ArrayList<>();
         for (int i = 0; i < workerCount; i++) {
-            Thread wt = new Thread(this::runRepWorker, "Rep-Worker-" + i);
-            workerThreads.add(wt);
+            Thread worker = workerFactory.newThread(this::runRepWorker);
+            worker.start();
+            threads.add(worker);
         }
 
-        pullThread.start();
-        subThread.start();
-        reactiveThread.start();
-        chatServerPubThread.start();
-
-        proxyThread.start();
-        workerThreads.forEach(Thread::start);
         logger.info("[REP-WORKER] All internal workers initialized (proxied via port " + this.repPort + ")");
 
         try {
-            pullThread.join();
-            subThread.join();
-            reactiveThread.join();
-            chatServerPubThread.join();
-
-            proxyThread.join();
-            for (Thread wt : workerThreads) wt.join();
+            for (Thread thread : threads) {
+                thread.join();
+            }
         } catch (InterruptedException e) {
-            pullThread.interrupt();
-            subThread.interrupt();
-            reactiveThread.interrupt();
-            chatServerPubThread.interrupt();
-
-            proxyThread.interrupt();
-            workerThreads.forEach(Thread::interrupt);
+            for (Thread thread : threads) {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
+            }
         } finally {
             this.stop();
         }

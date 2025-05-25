@@ -12,6 +12,7 @@ import com.doge.common.proto.ExitMessage;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.zmq.PushEndpoint;
 import com.doge.common.socket.zmq.ReqEndpoint;
+import com.doge.common.socket.zmq.SubEndpoint;
 
 public class TopicCommand extends AbstractCommand {
     private Client client;
@@ -19,12 +20,14 @@ public class TopicCommand extends AbstractCommand {
     private PushEndpoint pushEndpoint;
     private ReqEndpoint aggregationServerReqEndpoint;
     private DhtClient dhtClient;
+    private SubEndpoint subEndpoint;
 
     public TopicCommand(
         Client client,
         PushEndpoint pushEndpoint,
         ReqEndpoint aggregationServerReqEndpoint,
-        DhtClient dhtClient
+        DhtClient dhtClient,
+        SubEndpoint subEndpoint
     ) {
         super("/topic", "<topic>");
         this.client = client;
@@ -32,6 +35,7 @@ public class TopicCommand extends AbstractCommand {
         this.pushEndpoint = pushEndpoint;
         this.aggregationServerReqEndpoint = aggregationServerReqEndpoint;
         this.dhtClient = dhtClient; 
+        this.subEndpoint = subEndpoint;
     }
 
     @Override
@@ -42,6 +46,12 @@ public class TopicCommand extends AbstractCommand {
         }
 
         String topic = args[0];
+        String currentTopic = this.client.getCurrentTopic();
+
+        if (topic == currentTopic) {
+            console.info("You are already in topic '" + topic + "'");
+            return;
+        }
 
         console.info("Searching for chat servers serving topic '" + topic + "' in DHT...");
         int chosenChatServer = this.searchByTopic(console, topic);
@@ -56,13 +66,14 @@ public class TopicCommand extends AbstractCommand {
             }
         }
 
-        MessageWrapper exitMessage = createExitMessage(client.getCurrentTopic(), client.getId());
+        MessageWrapper exitMessage = createExitMessage(currentTopic, client.getId());
         this.pushEndpoint.send(exitMessage);
         console.info("Notified old chat server about topic change");
 
-        client.setCurrentChatServer(chosenChatServer);
+        this.subEndpoint.unsubscribe(currentTopic);
         client.setCurrentTopic(topic);
 
+        client.setCurrentChatServer(chosenChatServer);
         console.info("Setting up connections to chosen chat server...");
         client.resetConnectionsToChatServer();
     }

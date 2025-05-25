@@ -1,5 +1,7 @@
 package com.doge.aggregation.server;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -81,18 +83,30 @@ public class AggregationServer {
     public void run() {
         this.running = true;
 
-        Thread pullThread = new Thread(this::runPull, "Pull-Thread");
-        Thread repThread = new Thread(this::runRep, "Rep-Thread");
+        List<Thread> threads = new ArrayList<>();
+
+        Thread pullThread = Thread.ofVirtual()
+            .name("Pull-Thread")
+            .start(this::runPull);
+
+        threads.add(pullThread);
+
+        Thread repThread = Thread.ofVirtual()
+            .name("Rep-Thread")
+            .start(this::runRep);
+
+        threads.add(repThread);
 
         try {
-            pullThread.start();
-            repThread.start();
-
-            pullThread.join();
-            repThread.join();
+            for (Thread thread : threads) {
+                thread.join();
+            }
         } catch (InterruptedException e) {
-            pullThread.interrupt();
-            repThread.interrupt();
+            for (Thread thread : threads) {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
+            }
         } finally {
             this.stop();
         }

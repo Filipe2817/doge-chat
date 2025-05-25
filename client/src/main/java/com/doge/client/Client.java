@@ -189,19 +189,33 @@ public class Client {
         
         console.info("Setting up connections to chosen chat server...");
         this.setupConnectionsToChatServer(); 
-        
-        Thread cliThread = new Thread(this::runCli, "Cli-Thread");
-        Thread subThread = new Thread(this::runSub, "Subscriber-Thread");
+
+        List<Thread> threads = new ArrayList<>();
+
+        Thread cliThread = Thread.ofVirtual()
+                .name("Cli-Thread")
+                .start(this::runCli);
+
+        threads.add(cliThread);
+
+        Thread subThread = Thread.ofVirtual()
+                .name("Subscriber-Thread")
+                .start(this::runSub);
+
+        threads.add(subThread);
 
         try {
-            cliThread.start(); 
-            subThread.start();
+            for (Thread thread : threads) {
+                thread.join();
+            }
 
-            cliThread.join(); 
-            subThread.join();
         } catch (InterruptedException e) {
-            cliThread.interrupt();
-            subThread.interrupt();
+            for (Thread thread : threads) {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
+            }
+
             this.stop();
         } 
     } 
@@ -216,7 +230,8 @@ public class Client {
             this, 
             this.pushEndpoint,
             this.aggregationServerReqEndpoint,
-            this.dhtClient
+            this.dhtClient,
+            this.subEndpoint
         ));
         
         HelpCommand helpCommand = new HelpCommand(this.commandManager);
@@ -377,25 +392,28 @@ public class Client {
             chatMonitor.add(ZMonitor.Event.CONNECTED);
             chatMonitor.start();
 
-            new Thread(() -> {
-                while (this.running) {
-                    ZMonitor.ZEvent event = chatMonitor.nextEvent(1500);
-                    if (event != null && event.type == ZMonitor.Event.DISCONNECTED) {
-                        console.error("[REQ | Chat server] Chat server died. Connecting to other chat server...");
+            Thread.ofVirtual()
+                .name("ChatServer-Monitor-Thread")
+                .start(() -> {
+                    while (this.running) {
+                        ZMonitor.ZEvent event = chatMonitor.nextEvent(1500);
+                        if (event != null && event.type == ZMonitor.Event.DISCONNECTED) {
+                            console.error("[REQ | Chat server] Chat server died. Connecting to other chat server...");
 
-                        int newChatServer = this.getRandomChatServerWithDelete();
-                        if (newChatServer == -1) {
-                            console.error("No other chat servers available. Stopping client...");
-                            this.stop();
-                            return;
+                            int newChatServer = this.getRandomChatServerWithDelete();
+                            if (newChatServer == -1) {
+                                console.error("No other chat servers available. Stopping client...");
+                                this.stop();
+                                return;
+                            }
+
+                            console.info("Connecting to new chat server with id " + newChatServer);
+                            this.currentChatServer = newChatServer;
+                            this.resetConnectionsToChatServer();
                         }
-
-                        console.info("Connecting to new chat server with id " + newChatServer);
-                        this.currentChatServer = newChatServer;
-                        this.resetConnectionsToChatServer();
                     }
                 }
-            }, "ChatServer-Monitor-Thread").start();
+            );
         }
 
         console.debug("[REQ | Chat server] Connected on port (also monitoring chat server) " + port);
