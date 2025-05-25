@@ -2,6 +2,7 @@ package com.doge.client.socket.reactive;
 
 import java.util.concurrent.TimeUnit;
 
+import com.doge.client.Client;
 import com.doge.client.Console;
 import com.doge.common.proto.LogRequestMessage;
 import com.doge.common.proto.Rx3LogServiceGrpc;
@@ -14,13 +15,15 @@ import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class ReactiveGrpcClient {
+    private Client client;
     private final Console console;
 
     private Rx3LogServiceGrpc.RxLogServiceStub stub;
     private ManagedChannel channel;
     private Disposable currentSubscription;
 
-    public ReactiveGrpcClient(Console console) {
+    public ReactiveGrpcClient(Client client, Console console) {
+        this.client = client;
         this.console = console;
     }
 
@@ -55,7 +58,15 @@ public class ReactiveGrpcClient {
         }
     }
 
+    public void cancel() {
+        if (currentSubscription != null && !currentSubscription.isDisposed()) {
+            currentSubscription.dispose();
+        }
+    }
+
     public void getLogs(String topic, int last) {
+        this.client.rpcStarted();
+
         LogRequestMessage request = LogRequestMessage.newBuilder()
             .setTopic(topic)
             .setLast(last)
@@ -65,13 +76,18 @@ public class ReactiveGrpcClient {
             .subscribeOn(Schedulers.io())
             .observeOn(Schedulers.io(), false, 32)
             .subscribe(
-                resp ->  console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
+                resp -> console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),
-                () -> console.info("[LOGS] Successfully received all logs")
+                () -> {
+                    console.info("[LOGS] Successfully received all logs");
+                    this.client.rpcDone();
+                }
             );
     }
 
     public void getUserLogs(String topic, String userId, int last) {
+        this.client.rpcStarted();
+
         UserLogRequestMessage request = UserLogRequestMessage.newBuilder()
             .setTopic(topic)
             .setUserId(userId)
@@ -84,7 +100,10 @@ public class ReactiveGrpcClient {
             .subscribe(
                 resp -> console.info("[LOGS] [" + resp.getClientId() + "] " + resp.getContent()),
                 error -> console.error("[LOGS] Error: " + error.getMessage()),
-                () -> console.info("[LOGS] Successfully received all logs")
+                () -> {
+                    console.info("[LOGS] Successfully received all logs");
+                    this.client.rpcDone();
+                }
             );
     }
 }

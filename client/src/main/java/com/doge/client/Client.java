@@ -9,6 +9,7 @@ import java.util.Random;
 import org.zeromq.ZContext;
 import org.zeromq.ZMonitor;
 
+import com.doge.client.command.CancelCommand;
 import com.doge.client.command.CommandManager;
 import com.doge.client.command.ExitCommand;
 import com.doge.client.command.HelpCommand;
@@ -54,7 +55,10 @@ public class Client {
 
     private ReqEndpoint aggregationServerReqEndpoint;
     private SubEndpoint subEndpoint;
+
     private ReactiveGrpcClient reactiveClient;
+    private boolean rpcOngoing;
+
     private DhtClient dhtClient;
 
     private Console console;
@@ -80,6 +84,8 @@ public class Client {
         this.aggregationCount = 0;
 
         this.context = context;
+
+        this.rpcOngoing = false;
 
         this.console = new Console();
         console.alterSystemPrint();
@@ -140,6 +146,18 @@ public class Client {
         this.aggregationCount++;
     }
 
+    public boolean isRpcOngoing() {
+        return rpcOngoing;
+    }
+
+    public void rpcStarted() {
+        this.rpcOngoing = true;
+    }
+
+    public void rpcDone() {
+        this.rpcOngoing = false;
+    }
+
     public void run() throws IOException {
         this.running = true;
 
@@ -193,6 +211,7 @@ public class Client {
         this.commandManager.registerCommand(new ExitCommand(this, this.pushEndpoint));
         this.commandManager.registerCommand(new OnlineUsersCommand(this, this.chatServerReqEndpoint));
         this.commandManager.registerCommand(new LogsCommand(this, this.reactiveClient));
+        this.commandManager.registerCommand(new CancelCommand(this, this.reactiveClient));
         this.commandManager.registerCommand(new TopicCommand(
             this, 
             this.pushEndpoint,
@@ -304,7 +323,7 @@ public class Client {
         this.setupSubEndpoint(pubPort);
 
         int reactivePort = this.currentChatServer + 4;
-        this.reactiveClient = new ReactiveGrpcClient(console);
+        this.reactiveClient = new ReactiveGrpcClient(this, console);
         this.setupReactiveClient(reactivePort);
 
         console.info("Announcing to chat server...");

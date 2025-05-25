@@ -281,7 +281,8 @@ public class ChatServer {
         worker.on(MessageTypeCase.GETCHATSERVERSTATEMESSAGE, new GetChatServerStateMessageHandler(
             this,
             worker,
-            this.userManager
+            this.userManager,
+            this.logger
         ));
 
         worker.on(MessageTypeCase.NOTIFYNEWTOPICMESSAGE, new NotifyNewTopicMessageHandler(

@@ -43,6 +43,11 @@ public class LogsCommand extends AbstractCommand {
             return;
         }
 
+        if (this.client.isRpcOngoing()) {
+            console.error("Another RPC is already ongoing, please wait for it to finish. Or cancel it with /cancel");
+            return; 
+        } 
+
         if (userId != null) {
             reactiveClient.getUserLogs(client.getCurrentTopic(), userId, last);
         } else {

@@ -2,6 +2,7 @@ package com.doge.chat.server.handler;
 
 import com.doge.chat.server.ChatServer;
 import com.doge.chat.server.user.UserManager;
+import com.doge.common.Logger;
 import com.doge.common.proto.ChatServerStateMessage;
 import com.doge.common.proto.MessageWrapper;
 import com.doge.common.socket.MessageHandler;
@@ -12,22 +13,29 @@ public class GetChatServerStateMessageHandler implements MessageHandler<MessageW
 
     private RepEndpoint repEndpoint;
     private UserManager userManager;
+    
+    private Logger logger;
 
     public GetChatServerStateMessageHandler(
         ChatServer chatServer,
         RepEndpoint repEndpoint, 
-        UserManager userManager
+        UserManager userManager,
+        Logger logger
     ) {
         this.chatServer = chatServer;
 
         this.repEndpoint = repEndpoint;
         this.userManager = userManager;
+
+        this.logger = logger;
     }
 
     @Override
     public void handle(MessageWrapper message) {
         int userCount = userManager.getTotalUsers();
         int topicCount = chatServer.getTopicsBeingServed();
+
+        logger.info("Received request for chat server state: " + userCount + " users, " + topicCount + " topics");
 
         MessageWrapper responseMessage = createChatServerStateMessage(userCount, topicCount);
         repEndpoint.send(responseMessage);
